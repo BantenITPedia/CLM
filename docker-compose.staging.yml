@@ -1,0 +1,78 @@
+services:
+  celery_beat:
+    build: .
+    command: celery -A legal_clm beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+    - db
+    - redis
+    - web
+    env_file:
+    - .env
+    volumes:
+    - .:/app
+  celery_worker:
+    build: .
+    command: celery -A legal_clm worker --loglevel=info
+    depends_on:
+    - db
+    - redis
+    - web
+    env_file:
+    - .env
+    volumes:
+    - .:/app
+  db:
+    environment:
+      POSTGRES_DB: legal_clm_db
+      POSTGRES_PASSWORD: ClmStaging2026Pass!
+      POSTGRES_USER: clm_user
+    healthcheck:
+      interval: 5s
+      retries: 5
+      test:
+      - CMD-SHELL
+      - pg_isready -U clm_user
+      timeout: 5s
+    image: postgres:15-alpine
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+  nginx:
+    depends_on:
+    - web
+    expose:
+    - 8000
+    - 8001
+    image: nginx:alpine
+    volumes:
+    - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    - static_volume:/app/staticfiles
+    - media_volume:/app/media
+  redis:
+    healthcheck:
+      interval: 5s
+      retries: 5
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      timeout: 3s
+    image: redis:7-alpine
+  web:
+    build: .
+    command: gunicorn legal_clm.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+    - .env
+    volumes:
+    - .:/app
+    - static_volume:/app/staticfiles
+    - media_volume:/app/media
+version: '3.8'
+volumes:
+  media_volume: null
+  postgres_data: null
+  static_volume: null
