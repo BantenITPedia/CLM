@@ -1,0 +1,104 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: clm-db
+    environment:
+      POSTGRES_DB: legal_clm_db
+      POSTGRES_USER: clm_user
+      POSTGRES_PASSWORD: ClmSecure2026Pass!
+    volumes:
+    - clm_postgres_data:/var/lib/postgresql/data
+    networks:
+    - clm
+    restart: always
+    healthcheck:
+      test:
+      - \ CMD-SHELL\
+      - \pg_isready -U clm_user\
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: clm-redis
+    networks:
+    - clm
+    restart: always
+    healthcheck:
+      test:
+      - \CMD\
+      - \redis-cli\
+      - \ping\
+      interval: 10s
+      timeout: 3s
+      retries: 5
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: clm-app
+    command: gunicorn legal_clm.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout
+      120
+    volumes:
+    - clm_static_volume:/app/staticfiles
+    - clm_media_volume:/app/media
+    networks:
+    - clm
+    env_file:
+    - .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: clm-celery-worker
+    command: celery -A legal_clm worker --loglevel=info --concurrency=2
+    env_file:
+    - .env.prod
+    networks:
+    - clm
+    depends_on:
+    - db
+    - redis
+    restart: always
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: clm-celery-beat
+    command: celery -A legal_clm beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file:
+    - .env.prod
+    networks:
+    - clm
+    depends_on:
+    - db
+    - redis
+    restart: always
+  nginx:
+    image: nginx:alpine
+    container_name: clm-nginx
+    ports:
+    - 8001
+    volumes:
+    - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+    - clm_static_volume:/app/staticfiles:ro
+    - clm_media_volume:/app/media:ro
+    networks:
+    - clm
+    depends_on:
+    - web
+    restart: always
+volumes:
+  clm_postgres_data: null
+  clm_static_volume: null
+  clm_media_volume: null
+networks:
+  clm:
+    driver: bridge

@@ -1,0 +1,370 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ action }} Contract - Legal CLM{% endblock %}
+{% block page_title %}{{ action }} Contract{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-earmark-text"></i> {{ action }} Contract
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <strong>Please correct the errors below:</strong>
+                        <ul class="mb-0">
+                            {% for field, errors in form.errors.items %}
+                                {% for error in errors %}
+                                    <li>{{ field }}: {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.title.id_for_label }}" class="form-label">Contract Title *</label>
+                                {{ form.title }}
+                                {% if form.title.errors %}
+                                    <div class="text-danger">{{ form.title.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                    <label for="{{ form.contract_type.id_for_label }}" class="form-label">Contract Type *</label>
+                                    {{ form.contract_type }}
+                                    {% if form.contract_type.errors %}
+                                        <div class="text-danger">{{ form.contract_type.errors }}</div>
+                                    {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.contract_value.id_for_label }}" class="form-label">Target Value (IDR)</label>
+                                {{ form.contract_value }}
+                                <small class="form-text text-muted">Format: 1,000,000</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.party_b.id_for_label }}" class="form-label">Legal Entity Name (PT / CV / Others) *</label>
+                                {{ form.party_b }}
+                            </div>
+                        </div>
+                        
+                        {% if data_form %}
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <strong>General Trade Agreement Fields</strong>
+                            </div>
+                            <div class="card-body">
+                                {% for field in data_form %}
+                                <div class="mb-3">
+                                    <label class="form-label" for="{{ field.id_for_label }}">
+                                        {{ field.label }}
+                                        {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                    <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                    <small class="form-text text-muted">{{ field.help_text }}</small>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.start_date.id_for_label }}" class="form-label">Start Date</label>
+                                {{ form.start_date }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.end_date.id_for_label }}" class="form-label">End Date</label>
+                                {{ form.end_date }}
+                                <small class="form-text text-muted">Auto-calculated as: Start Date + 1 year - 1 day</small>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <strong>Renewal Settings</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="{{ form.renewal_reminder_days.id_for_label }}" class="form-label">Reminder Days Before Expiry</label>
+                                        {{ form.renewal_reminder_days }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="{{ form.renewal_period_months.id_for_label }}" class="form-label">Renewal Period (Months)</label>
+                                        {{ form.renewal_period_months }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <div class="form-check mt-4">
+                                            {{ form.auto_renew }}
+                                            <label class="form-check-label" for="{{ form.auto_renew.id_for_label }}">
+                                                Auto-Renew Contract
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3" id="additional-documents-card">
+                            <div class="card-header bg-light">
+                                <strong>Additional Documents</strong>
+                            </div>
+                            <div class="card-body">
+                                <div id="additional-documents-container">
+                                    <div class="row g-2 mb-2 document-row">
+                                        <div class="col-md-5">
+                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="Document Title">
+                                        </div>
+                                        <div class="col-md-7">
+                                            <input type="file" name="additional_documents" class="form-control">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2 document-row">
+                                        <div class="col-md-5">
+                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="Document Title">
+                                        </div>
+                                        <div class="col-md-7">
+                                            <input type="file" name="additional_documents" class="form-control">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-2 document-row">
+                                        <div class="col-md-5">
+                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="Document Title">
+                                        </div>
+                                        <div class="col-md-7">
+                                            <input type="file" name="additional_documents" class="form-control">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="add-document-row">
+                                    <i class="bi bi-plus-circle"></i> Add another document
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
+                            {{ form.notes }}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'contract_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> {{ action }} Contract
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Format target value with thousand separators
+    document.addEventListener('DOMContentLoaded', function() {
+        const addDocButton = document.getElementById('add-document-row');
+        const docsContainer = document.getElementById('additional-documents-container');
+        if (addDocButton && docsContainer) {
+            addDocButton.addEventListener('click', function() {
+                const row = document.createElement('div');
+                row.className = 'row g-2 mb-2 document-row';
+                row.innerHTML = `
+                    <div class="col-md-5">
+                        <input type="text" name="additional_document_titles" class="form-control" placeholder="Document Title">
+                    </div>
+                    <div class="col-md-7">
+                        <input type="file" name="additional_documents" class="form-control">
+                    </div>
+                `;
+                docsContainer.appendChild(row);
+            });
+        }
+
+        const contractTypeSelect = document.getElementById('id_contract_type');
+        if (contractTypeSelect) {
+            contractTypeSelect.addEventListener('change', function() {
+                const selected = contractTypeSelect.value || '';
+                const url = new URL(window.location.href);
+                if (selected) {
+                    url.searchParams.set('contract_type', selected);
+                } else {
+                    url.searchParams.delete('contract_type');
+                }
+                window.location.href = url.toString();
+            });
+        }
+
+        const valueField = document.querySelector('input[name="contract_value"]');
+        if (valueField) {
+            // Format on input
+            valueField.addEventListener('input', function() {
+                let value = this.value.replace(/[^0-9]/g, '');
+                if (value) {
+                    this.value = parseInt(value).toLocaleString('id-ID');
+                }
+            });
+            
+            // Remove formatting before submit
+            valueField.closest('form').addEventListener('submit', function(e) {
+                valueField.value = valueField.value.replace(/[^0-9]/g, '');
+                // Validate it's a valid number
+                if (valueField.value && isNaN(parseInt(valueField.value))) {
+                    e.preventDefault();
+                    alert('Target Value must be a valid number');
+                }
+            });
+            
+            // Format initial value if any
+            if (valueField.value) {
+                let value = valueField.value.replace(/[^0-9]/g, '');
+                if (value) {
+                    valueField.value = parseInt(value).toLocaleString('id-ID');
+                }
+            }
+        }
+        
+        // Auto-calculate end date (start date + 1 year - 1 day)
+        const startDateField = document.querySelector('input[name="start_date"]');
+        const endDateField = document.querySelector('input[name="end_date"]');
+        
+        if (startDateField && endDateField) {
+            startDateField.addEventListener('change', function() {
+                if (this.value) {
+                    const startDate = new Date(this.value);
+                    const endDate = new Date(startDate);
+                    // Add 1 year, then subtract 1 day (business rule)
+                    endDate.setFullYear(startDate.getFullYear() + 1);
+                    endDate.setDate(endDate.getDate() - 1);
+                    
+                    // Format as YYYY-MM-DD for date input
+                    const year = endDate.getFullYear();
+                    const month = String(endDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(endDate.getDate()).padStart(2, '0');
+                    endDateField.value = `${year}-${month}-${day}`;
+                }
+            });
+        }
+
+        const totalTargetField = document.querySelector('input[name="total_purchase_target"]') || document.querySelector('input[name="contract_value"]');
+        const q1Field = document.querySelector('input[name="sales_target_q1"]');
+        const q2Field = document.querySelector('input[name="sales_target_q2"]');
+        const q3Field = document.querySelector('input[name="sales_target_q3"]');
+        const q4Field = document.querySelector('input[name="sales_target_q4"]');
+
+        const q1PeriodField = document.querySelector('input[name="quarter_1_period"]');
+        const q2PeriodField = document.querySelector('input[name="quarter_2_period"]');
+        const q3PeriodField = document.querySelector('input[name="quarter_3_period"]');
+        const q4PeriodField = document.querySelector('input[name="quarter_4_period"]');
+
+        const parseNumber = (value) => {
+            if (!value) return NaN;
+            const cleaned = value.toString().replace(/[^0-9.]/g, '');
+            return cleaned ? parseFloat(cleaned) : NaN;
+        };
+
+        const setQuarterTargets = () => {
+            if (!totalTargetField || !q1Field || !q2Field || !q3Field || !q4Field) return;
+            const total = parseNumber(totalTargetField.value);
+            if (Number.isNaN(total)) return;
+
+            const base = Math.floor(total / 4);
+            const remainder = total - (base * 4);
+            q1Field.value = base;
+            q2Field.value = base;
+            q3Field.value = base;
+            q4Field.value = base + remainder;
+        };
+
+        if (totalTargetField) {
+            totalTargetField.addEventListener('input', setQuarterTargets);
+        }
+
+        const addMonths = (date, months) => {
+            const d = new Date(date.getTime());
+            const day = d.getDate();
+            d.setMonth(d.getMonth() + months);
+            if (d.getDate() < day) {
+                d.setDate(0);
+            }
+            return d;
+        };
+
+        const formatDate = (date) => date.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+
+        const setQuarterPeriods = () => {
+            if (!startDateField || !q1PeriodField || !q2PeriodField || !q3PeriodField || !q4PeriodField) return;
+            if (!startDateField.value) return;
+
+            const startDate = new Date(startDateField.value);
+            if (Number.isNaN(startDate.getTime())) return;
+
+            const q1Start = startDate;
+            const q2Start = addMonths(startDate, 3);
+            const q3Start = addMonths(startDate, 6);
+            const q4Start = addMonths(startDate, 9);
+
+            const q2End = new Date(q2Start.getTime());
+            q2End.setDate(q2End.getDate() - 1);
+            const q3End = new Date(q3Start.getTime());
+            q3End.setDate(q3End.getDate() - 1);
+            const q4End = new Date(q4Start.getTime());
+            q4End.setDate(q4End.getDate() - 1);
+
+            let finalEnd = q4End;
+            if (endDateField && endDateField.value) {
+                const endDate = new Date(endDateField.value);
+                if (!Number.isNaN(endDate.getTime())) {
+                    finalEnd = endDate;
+                }
+            } else {
+                const q5Start = addMonths(startDate, 12);
+                finalEnd = new Date(q5Start.getTime());
+                finalEnd.setDate(finalEnd.getDate() - 1);
+            }
+
+            q1PeriodField.value = `${formatDate(q1Start)} - ${formatDate(q2End)}`;
+            q2PeriodField.value = `${formatDate(q2Start)} - ${formatDate(q3End)}`;
+            q3PeriodField.value = `${formatDate(q3Start)} - ${formatDate(q4End)}`;
+            q4PeriodField.value = `${formatDate(q4Start)} - ${formatDate(finalEnd)}`;
+        };
+
+        if (totalTargetField) {
+            totalTargetField.addEventListener('input', setQuarterTargets);
+            setQuarterTargets();
+        }
+
+        if (startDateField) {
+            startDateField.addEventListener('change', setQuarterPeriods);
+        }
+        if (endDateField) {
+            endDateField.addEventListener('change', setQuarterPeriods);
+        }
+        setQuarterPeriods();
+    });
+</script>
+{% endblock %}

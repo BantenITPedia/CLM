@@ -1,0 +1,20 @@
+{% load contract_filters %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Format Number Test</title>
+</head>
+<body>
+    <h1>Format Number Filter Test</h1>
+    
+    <h2>Test Values:</h2>
+    <ul>
+        <li>22500000000 -> {{ "22500000000"|format_number }}</li>
+        <li>90000000000 -> {{ "90000000000"|format_number }}</li>
+        <li>102930 -> {{ "102930"|format_number }}</li>
+        <li>1234567.89 -> {{ "1234567.89"|format_number }}</li>
+        <li>Jakarta -> {{ "Jakarta"|format_number }}</li>
+        <li>-5000000 -> {{ "-5000000"|format_number }}</li>
+    </ul>
+</body>
+</html>

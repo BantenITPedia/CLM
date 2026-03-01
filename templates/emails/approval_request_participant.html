@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #ffc107; color: #000; padding: 20px; text-align: center; }
+        .content { background: #f8f9fa; padding: 20px; }
+        .footer { background: #212529; color: #adb5bd; padding: 15px; text-align: center; font-size: 12px; }
+        .btn { display: inline-block; padding: 12px 30px; background: #ffc107; color: #000; text-decoration: none; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+        .alert-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+        .info-box { background: white; padding: 15px; margin: 10px 0; border-left: 4px solid #0d6efd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>⏳ ACTION REQUIRED: Approval Needed</h2>
+        </div>
+        <div class="content">
+            <p>Hello {{ participant_name }},</p>
+            
+            <div class="alert-box">
+                <strong>Your approval is required to proceed with this contract.</strong>
+            </div>
+
+            <h3>Contract Details:</h3>
+            <div class="info-box">
+                <strong>Contract:</strong> {{ contract.title }}<br>
+                <strong>Type:</strong> {{ contract.get_contract_type_display }}<br>
+                <strong>Party A:</strong> {{ contract.party_a }}<br>
+                <strong>Party B:</strong> {{ contract.party_b }}<br>
+                {% if contract.contract_value %}
+                <strong>Value:</strong> ${{ contract.contract_value }}<br>
+                {% endif %}
+                <strong>Status:</strong> {{ contract.get_status_display }}<br>
+                {% if contract.start_date %}
+                <strong>Start Date:</strong> {{ contract.start_date|date:"M d, Y" }}<br>
+                {% endif %}
+            </div>
+
+            <p><strong>What you need to do:</strong></p>
+            <ol>
+                <li>Click the button below to review the contract and submitted data</li>
+                <li>Check the structured data that was submitted</li>
+                <li>Review the generated draft document</li>
+                <li>Approve or request changes</li>
+            </ol>
+
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{ site_url }}/contracts/{{ contract.pk }}/" class="btn">Review & Approve</a>
+            </p>
+
+            <p style="font-size: 13px; color: #666;">
+                <strong>Note:</strong> Please review all details carefully before approving. Once approved, the contract will proceed to the next stage.
+            </p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 Legal CLM. All rights reserved.</p>
+            <p>This is an automated notification. If you have questions, please contact the contract owner or legal team.</p>
+        </div>
+    </div>
+</body>
+</html>

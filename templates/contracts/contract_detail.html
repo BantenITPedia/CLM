@@ -1,0 +1,580 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% load contract_filters %}
+
+{% block title %}{{ contract.title }} - Legal CLM{% endblock %}
+{% block page_title %}Contract Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Contract Header -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h3>{{ contract.title }}</h3>
+                    <p class="text-muted mb-2">
+                        <strong>Type:</strong> {{ contract.get_contract_type_display }} |
+                        <strong>ID:</strong> #{{ contract.id }}
+                    </p>
+                    <span class="badge bg-{% if contract.status == 'ACTIVE' %}success{% elif contract.status == 'EXPIRED' %}danger{% elif contract.status == 'EXPIRING_SOON' %}warning{% else %}secondary{% endif %} fs-6">
+                        {{ contract.get_status_display }}
+                    </span>
+                </div>
+                <div>
+                    {% has_contract_permission user contract 'edit_contract' as can_edit %}
+                    {% has_contract_permission user contract 'delete_contract' as can_delete %}
+                    {% has_contract_permission user contract 'edit_structured_data' as can_data %}
+
+                    {% if can_edit %}
+                    <a href="{% url 'contract_edit' contract.pk %}" class="btn btn-primary">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                    {% endif %}
+                    {% if can_delete %}
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                    {% endif %}
+                    {% if can_data %}
+                    <a href="{% url 'contract_data_input' contract.pk %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-clipboard-check"></i> Structured Data
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Left Column -->
+        <div class="col-md-8">
+            <!-- Contract Information -->
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Contract Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <strong>Party A:</strong> {{ contract.party_a }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Party B:</strong> {{ contract.party_b }}
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <strong>Start Date:</strong> {{ contract.start_date|date:"M d, Y"|default:"-" }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>End Date:</strong> {{ contract.end_date|date:"M d, Y"|default:"-" }}
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <strong>Target Value:</strong> 
+                            {% if contract.contract_value %}
+                                Rp {{ contract.contract_value|intcomma }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Contract Duration:</strong>
+                            {% if contract.contract_duration_display %}
+                                <span class="badge bg-info">
+                                    {{ contract.contract_duration_display }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-md-12">
+                            <strong>Description:</strong><br>
+                            {{ contract.description|default:"No description provided"|linebreaks }}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Owner:</strong> {{ contract.owner.get_full_name|default:contract.owner.username }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Created:</strong> {{ contract.created_at|date:"M d, Y H:i" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Renewal Settings -->
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Renewal Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Reminder Days:</strong> {{ contract.renewal_reminder_days }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Renewal Period:</strong> {{ contract.renewal_period_months }} months
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Auto-Renew:</strong> 
+                            {% if contract.auto_renew %}
+                                <span class="badge bg-success">Enabled</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Disabled</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Participants -->
+            <div class="card mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> Participants</h5>
+                    {% has_contract_permission user contract 'manage_participants' as can_manage_participants %}
+                    {% if can_manage_participants %}
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addParticipantModal">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if participants %}
+                    <div class="list-group">
+                        {% for participant in participants %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ participant.user.get_full_name|default:participant.user.username }}</h6>
+                                <span class="badge bg-primary">{{ participant.get_role_display }}</span>
+                            </div>
+                            <small class="text-muted">{{ participant.user.email }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No participants added yet</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            
+            <!-- Comments -->
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Comments</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Add Comment Form -->
+                    {% has_contract_permission user contract 'add_comment' as can_add_comment %}
+                    {% if can_add_comment %}
+                    <form method="post" action="{% url 'add_comment' contract.pk %}" class="mb-3">
+                        {% csrf_token %}
+                        {{ comment_form.text }}
+                        <div class="form-check mt-2 mb-2">
+                            {{ comment_form.is_internal }}
+                            <label class="form-check-label" for="{{ comment_form.is_internal.id_for_label }}">
+                                Internal comment (not visible to customers)
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-plus-circle"></i> Add Comment
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    <!-- Comments List -->
+                    {% if comments %}
+                    {% for comment in comments %}
+                    <div class="border-start border-3 border-primary ps-3 mb-3">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ comment.user.get_full_name|default:comment.user.username }}</strong>
+                            <small class="text-muted">{{ comment.created_at|date:"M d, Y H:i" }}</small>
+                        </div>
+                        <p class="mb-1">{{ comment.text }}</p>
+                        {% if comment.is_internal %}
+                        <small><span class="badge bg-warning">Internal</span></small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted text-center">No comments yet</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Column -->
+        <div class="col-md-4">
+            <!-- Structured Data -->
+            <div class="card mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-ui-checks-grid"></i> Structured Data</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        {% has_contract_permission user contract 'edit_structured_data' as can_edit_structured_data %}
+                        {% if can_edit_structured_data %}
+                        <a href="{% url 'contract_data_input' contract.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil-square"></i> {% if contract_data %}Edit Data{% else %}Add Data{% endif %}
+                        </a>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#structuredDataCollapse" aria-expanded="false" aria-controls="structuredDataCollapse">
+                            <i class="bi bi-chevron-expand"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if contract_data and contract_data.data %}
+                    <div class="bg-light rounded p-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-info">Version {{ contract_data.version }}</span>
+                                <small class="text-muted">Updated on {{ contract_data.submitted_at|date:"M d, Y" }}</small>
+                            </div>
+                            <small class="text-muted">{{ contract_data.data|length }} fields</small>
+                        </div>
+                        <div class="row mt-2">
+                            {% for key, value in contract_data.data.items %}
+                            {% if forloop.counter <= 4 %}
+                            <div class="col-6 mb-2">
+                                <strong>{{ key|friendly_field_name|title }}:</strong> {{ value|format_number:key }}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% if contract_data.data|length > 4 %}
+                        <div class="mt-1">
+                            <small class="text-muted">+ {{ contract_data.data|length|add:"-4" }} more fields</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="collapse" id="structuredDataCollapse">
+                        <div class="row g-2" style="max-height: 360px; overflow-y: auto;">
+                            {% for key, value in contract_data.data.items %}
+                            <div class="col-12 col-md-6">
+                                <div class="p-2 bg-white">
+                                    <strong>{{ key|friendly_field_name|title }}:</strong> {{ value|format_number:key }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if contract_data.files.exists %}
+                        <hr class="my-3">
+                        <div>
+                            <small class="text-uppercase text-muted fw-bold d-block mb-2">Attached Documents</small>
+                            <div class="list-group list-group-flush">
+                                {% for file in contract_data.files.all %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                    <div>
+                                        <small class="d-block text-muted">{{ file.field_key|friendly_field_name }}</small>
+                                        <small class="text-secondary">{{ file.file.name|truncatechars:30 }}</small>
+                                    </div>
+                                    <a href="{{ file.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if all_data_versions.count > 1 %}
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#dataVersions">
+                                View {{ all_data_versions.count|add:"-1" }} Previous Version{{ all_data_versions.count|add:"-1"|pluralize }}
+                            </button>
+                            <div class="collapse mt-2" id="dataVersions">
+                                {% for version in all_data_versions %}
+                                {% if not forloop.first %}
+                                <div class="border-start border-3 ps-2 mb-2">
+                                    <strong>v{{ version.version }}</strong> - 
+                                    <small class="text-muted">{{ version.submitted_at|date:"M d, Y H:i" }} by {{ version.submitted_by.username }}</small>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-2">No structured data submitted yet.</p>
+                    {% if user.is_staff %}
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i> <strong>Setup Required:</strong> Configure fields for this contract type in <a href="/admin/contracts/contractfield/" class="alert-link" target="_blank">Admin → Contract Fields</a>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Drafts -->
+            <div class="card mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-file-text"></i> Drafts</h5>
+                    {% has_contract_permission user contract 'regenerate_draft' as can_regenerate %}
+                    {% if can_regenerate and contract_data %}
+                    <a href="{% url 'regenerate_contract_draft' contract.pk %}" class="btn btn-sm btn-outline-secondary">Regenerate</a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if drafts %}
+                    {% for draft in drafts %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>v{{ draft.version }}</strong><br>
+                            <small class="text-muted">{{ draft.created_at|date:"M d, Y H:i" }}</small>
+                        </div>
+                        <a href="{{ draft.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-download"></i> Download
+                        </a>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted small">No drafts generated yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Status Update -->
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-arrows-angle-contract"></i> Update Status</h5>
+                </div>
+                <div class="card-body">
+                    {% has_contract_permission user contract 'update_status' as can_update_status %}
+                    {% if can_update_status %}
+                    <form method="post" action="{% url 'update_status' contract.pk %}">
+                        {% csrf_token %}
+                        {{ status_form.status }}
+                        <button type="submit" class="btn btn-primary w-100 mt-2">
+                            <i class="bi bi-check-circle"></i> Update Status
+                        </button>
+                    </form>
+                    {% else %}
+                    <p class="text-muted small mb-0">You do not have permission to update status.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Documents -->
+            <div class="card mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark"></i> Documents</h5>
+                    {% has_contract_permission user contract 'add_document' as can_add_document %}
+                    {% if can_add_document %}
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addDocumentModal">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if contract.document %}
+                    <div class="mb-2">
+                        <strong>Main Contract:</strong><br>
+                        <a href="{{ contract.document.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                            <i class="bi bi-download"></i> Download
+                        </a>
+                    </div>
+                    <hr>
+                    {% endif %}
+                    
+                    {% if documents %}
+                    {% for doc in documents %}
+                    <div class="mb-2">
+                        <strong>{{ doc.title }}</strong><br>
+                        <small class="text-muted">{{ doc.uploaded_at|date:"M d, Y" }}</small><br>
+                        <a href="{{ doc.document.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                            <i class="bi bi-download"></i> Download
+                        </a>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted small text-center">No additional documents</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Final Approved Document -->
+            <div class="card mb-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-file-check"></i> Final Approved Document</h5>
+                    {% if can_upload_final %}
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#uploadFinalDocumentModal">
+                        <i class="bi bi-upload"></i> Upload
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if contract.final_approved_document %}
+                    <div class="alert alert-success mb-3">
+                        <i class="bi bi-check-circle"></i> <strong>Signed Final Contract</strong>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Uploaded by:</strong> {{ contract.final_approved_document.uploaded_by.get_full_name|default:contract.final_approved_document.uploaded_by.username }}<br>
+                        <strong>Date:</strong> {{ contract.final_approved_document.uploaded_at|date:"M d, Y H:i" }}
+                    </div>
+                    <a href="{{ contract.final_approved_document.document.url }}" target="_blank" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-download"></i> Download Final Document
+                    </a>
+                    {% if contract.final_approved_document.notes %}
+                    <div class="mt-3">
+                        <strong>Notes:</strong>
+                        <p class="text-muted">{{ contract.final_approved_document.notes }}</p>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-muted small">No final approved document uploaded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Audit Log -->
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Audit Log</h5>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    {% if audit_logs %}
+                    {% for log in audit_logs %}
+                    <div class="border-start border-2 ps-2 mb-2">
+                        <small class="text-muted">{{ log.timestamp|date:"M d, Y H:i" }}</small><br>
+                        <strong>{{ log.get_action_display }}</strong><br>
+                        {% if log.user %}
+                        <small>by {{ log.user.username }}</small><br>
+                        {% endif %}
+                        {% if log.details %}
+                        <small class="text-muted">{{ log.details }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted small text-center">No audit logs</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Participant Modal -->
+<div class="modal fade" id="addParticipantModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Participant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'add_participant' contract.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="{{ participant_form.user.id_for_label }}" class="form-label">User</label>
+                        {{ participant_form.user }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ participant_form.role.id_for_label }}" class="form-label">Role</label>
+                        {{ participant_form.role }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Participant</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Document Modal -->
+<div class="modal fade" id="addDocumentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'add_document' contract.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="{{ document_form.title.id_for_label }}" class="form-label">Title</label>
+                        {{ document_form.title }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ document_form.document.id_for_label }}" class="form-label">Document</label>
+                        {{ document_form.document }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ document_form.description.id_for_label }}" class="form-label">Description</label>
+                        {{ document_form.description }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Final Document Modal -->
+<div class="modal fade" id="uploadFinalDocumentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-file-check"></i> Upload Final Signed Contract</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'upload_final_document' contract.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="text-muted">Upload the final signed and approved contract document.</p>
+                    <div class="mb-3">
+                        <label for="{{ final_approval_form.document.id_for_label }}" class="form-label">Document <span class="text-danger">*</span></label>
+                        {{ final_approval_form.document }}
+                        <small class="form-text text-muted">Accepted formats: PDF, Word documents</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="{{ final_approval_form.notes.id_for_label }}" class="form-label">Notes</label>
+                        {{ final_approval_form.notes }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-upload"></i> Upload Document
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this contract?</p>
+                <p><strong>{{ contract.title }}</strong></p>
+                <p class="text-danger">This action cannot be undone!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'contract_delete' contract.pk %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete Contract</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

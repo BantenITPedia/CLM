@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Perjanjian Kerja Sama Keagenan</title>
+  <style>
+    body {
+      font-family: "Times New Roman", serif;
+      font-size: 12pt;
+      line-height: 1.6;
+    }
+    h1, h2, h3 {
+      text-align: center;
+      font-weight: bold;
+    }
+    .center { text-align: center; }
+    .section-title {
+      text-align: center;
+      font-weight: bold;
+      margin-top: 30px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    table, th, td {
+      border: 1px solid #000;
+    }
+    th, td {
+      padding: 6px;
+      vertical-align: top;
+    }
+    .signature td {
+      border: none;
+      text-align: center;
+      padding-top: 50px;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>PERJANJIAN KERJA SAMA KEAGENAN</h1>
+
+<p class="center">
+ANTARA<br><br>
+<strong>PT PERFECT COMPANION INDONESIA</strong><br><br>
+DENGAN<br><br>
+<strong>{{ party_b_legal_name }}</strong>
+</p>
+
+<p class="center">
+Nomor: {{ contract_number }}
+</p>
+
+<p>
+Perjanjian Kerja Sama Keagenan ini (“Perjanjian”) dibuat dan ditandatangani
+pada tanggal {{ contract_signing_date }}, oleh dan antara:
+</p>
+
+<p>
+<strong>PT Perfect Companion Indonesia</strong>, berkedudukan di Wisma 77 Lantai 18,
+Jalan Letjen S. Parman, Slipi, Jakarta Barat, DKI Jakarta – Indonesia,
+dalam hal ini diwakili oleh <strong>Handoko Tingsantoso</strong>,
+selaku <strong>Direktur Utama</strong>, berdasarkan kewenangannya untuk dan atas
+nama PT Perfect Companion Indonesia, selanjutnya disebut
+<strong>“Pihak Pertama”</strong>.
+</p>
+
+<p>
+<strong>{{ party_b_legal_name }}</strong>, berkedudukan di
+{{ party_b_registered_address }},
+dalam hal ini diwakili oleh
+<strong>{{ party_b_authorized_representative_name }}</strong>,
+selaku
+<strong>{{ party_b_authorized_representative_title }}</strong>,
+berdasarkan kewenangannya untuk dan atas nama
+{{ party_b_legal_name }},
+selanjutnya disebut <strong>“Pihak Kedua”</strong>.
+</p>
+
+<p>
+Pihak Pertama dan Pihak Kedua selanjutnya secara bersama-sama disebut
+<strong>“Para Pihak”</strong>.
+</p>
+
+<div class="section-title">PASAL 1<br>DEFINISI</div>
+
+<p>
+Istilah-istilah yang digunakan dalam Perjanjian ini mempunyai arti sebagaimana
+ditentukan dalam Perjanjian ini, kecuali ditentukan lain.
+</p>
+
+<div class="section-title">PASAL 2<br>RUANG LINGKUP KERJA SAMA</div>
+
+<p>
+Pihak Pertama memberikan hak non-eksklusif kepada Pihak Kedua untuk menjual
+Produk melalui tempat usaha Pihak Kedua sebagaimana tercantum dalam Lampiran A.
+</p>
+
+<div class="section-title">PASAL 3<br>JANGKA WAKTU</div>
+
+<p>
+Perjanjian ini berlaku sejak tanggal
+<strong>{{ contract_effective_start_date }}</strong>
+sampai dengan tanggal
+<strong>{{ contract_effective_end_date }}</strong>.
+</p>
+
+<div class="section-title">PASAL 4<br>BIAYA DAN PEMBAYARAN</div>
+
+<p>
+Target pembelian tahunan Produk oleh Pihak Kedua adalah sebesar
+<strong>Rp {{ total_annual_purchase_target }}</strong>
+sebagaimana diatur dalam Lampiran B.
+</p>
+
+<div class="section-title">PASAL 5<br>PRODUK DAN PENGIRIMAN</div>
+
+<p>
+Pengiriman Produk dilakukan ke alamat berikut:
+<br><strong>{{ party_b_delivery_address }}</strong>
+</p>
+
+<div class="section-title">PASAL 6<br>HAK KEKAYAAN INTELEKTUAL</div>
+
+<p>
+Seluruh Hak Kekayaan Intelektual atas Produk tetap menjadi milik Pihak Pertama.
+</p>
+
+<div class="section-title">PASAL 7<br>EVALUASI</div>
+
+<p>
+Evaluasi kerja sama dilakukan setiap triwulan selama Jangka Waktu Perjanjian.
+</p>
+
+<div class="section-title">PASAL 8<br>BATASAN TANGGUNG JAWAB</div>
+
+<p>
+Masing-masing Pihak bertanggung jawab atas pelaksanaan kewajibannya berdasarkan
+Perjanjian ini.
+</p>
+
+<div class="section-title">PASAL 9<br>PERNYATAAN DAN JAMINAN</div>
+
+<p>
+Para Pihak menyatakan dan menjamin bahwa mereka berwenang untuk menandatangani
+Perjanjian ini.
+</p>
+
+<div class="section-title">PASAL 10<br>BERAKHIRNYA PERJANJIAN</div>
+
+<p>
+Perjanjian ini berakhir sesuai ketentuan yang diatur dalam Perjanjian ini.
+</p>
+
+<div class="section-title">PASAL 11<br>HUKUM YANG BERLAKU</div>
+
+<p>
+Perjanjian ini tunduk pada hukum Republik Indonesia.
+</p>
+
+<div class="section-title">PASAL 12<br>KETENTUAN LAINNYA</div>
+
+<p>
+Lampiran-lampiran merupakan bagian yang tidak terpisahkan dari Perjanjian ini.
+</p>
+
+<!-- SIGNATURE -->
+<table class="signature">
+  <tr>
+    <td>
+      <strong>Pihak Pertama</strong><br><br>
+      PT Perfect Companion Indonesia<br><br><br>
+      <strong>Handoko Tingsantoso</strong><br>
+      Direktur Utama
+    </td>
+    <td>
+      <strong>Pihak Kedua</strong><br><br>
+      {{ party_b_legal_name }}<br><br><br>
+      <strong>{{ party_b_authorized_representative_name }}</strong><br>
+      {{ party_b_authorized_representative_title }}
+    </td>
+  </tr>
+</table>
+
+<!-- LAMPIRAN A -->
+<div class="page-break"></div>
+<h2>LAMPIRAN A</h2>
+
+<table>
+<tr><td>Nama Tempat Usaha</td><td>{{ party_b_business_location_name }}</td></tr>
+<tr><td>Registered Legal Address</td><td>{{ party_b_registered_address }}</td></tr>
+<tr><td>Delivery / Operational Address</td><td>{{ party_b_delivery_address }}</td></tr>
+<tr><td>Business Form</td><td>{{ party_b_business_form }}</td></tr>
+<tr><td>Customer / Partner Code (CVCODE)</td><td>{{ customer_partner_code }}</td></tr>
+<tr><td>Authorized Product Categories</td><td>{{ authorized_product_categories }}</td></tr>
+</table>
+
+<!-- LAMPIRAN B -->
+<div class="page-break"></div>
+<h2>LAMPIRAN B<br>TARGET PENJUALAN</h2>
+
+<table>
+<tr><th>Periode</th><th>Target (IDR)</th></tr>
+<tr><td>{{ q1_period }}</td><td>{{ q1_sales_target }}</td></tr>
+<tr><td>{{ q2_period }}</td><td>{{ q2_sales_target }}</td></tr>
+<tr><td>{{ q3_period }}</td><td>{{ q3_sales_target }}</td></tr>
+<tr><td>{{ q4_period }}</td><td>{{ q4_sales_target }}</td></tr>
+<tr><th>Total Tahunan</th><th>{{ total_annual_purchase_target }}</th></tr>
+</table>
+
+<!-- LAMPIRAN C -->
+<div class="page-break"></div>
+<h2>LAMPIRAN C<br>SKEMA INSENTIF</h2>
+
+<table>
+<tr>
+  <th>Achievement</th>
+  <th>D1</th>
+  <th>D2</th>
+  <th>D3</th>
+</tr>
+<tr>
+  <td>Yearly – Non Commodity</td>
+  <td>{{ incentive_yearly_non_commodity_d1 }}%</td>
+  <td>{{ incentive_yearly_non_commodity_d2 }}%</td>
+  <td>{{ incentive_yearly_non_commodity_d3 }}%</td>
+</tr>
+<tr>
+  <td>Quarterly – Non Commodity</td>
+  <td>{{ incentive_quarterly_non_commodity_d1 }}%</td>
+  <td>{{ incentive_quarterly_non_commodity_d2 }}%</td>
+  <td>{{ incentive_quarterly_non_commodity_d3 }}%</td>
+</tr>
+<tr>
+  <td>Yearly – Commodity</td>
+  <td>{{ incentive_yearly_commodity_d1 }}%</td>
+  <td>{{ incentive_yearly_commodity_d2 }}%</td>
+  <td>{{ incentive_yearly_commodity_d3 }}%</td>
+</tr>
+</table>
+
+</body>
+</html>

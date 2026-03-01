@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #6f42c1; color: white; padding: 20px; text-align: center; }
+        .content { background: #f8f9fa; padding: 20px; }
+        .footer { background: #212529; color: #adb5bd; padding: 15px; text-align: center; font-size: 12px; }
+        .btn { display: inline-block; padding: 10px 20px; background: #6f42c1; color: white; text-decoration: none; border-radius: 5px; }
+        .info-box { background: white; padding: 15px; margin: 10px 0; border-left: 4px solid #6f42c1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>🔄 Renewal Contract Created</h2>
+        </div>
+        <div class="content">
+            <h3>Auto-Renewal Contract Created</h3>
+            <p>A renewal contract has been automatically created based on an expiring contract.</p>
+            
+            <h4>New Renewal Contract:</h4>
+            <div class="info-box">
+                <strong>Contract ID:</strong> #{{ contract.id }}<br>
+                <strong>Title:</strong> {{ contract.title }}<br>
+                <strong>Type:</strong> {{ contract.get_contract_type_display }}<br>
+                <strong>Status:</strong> {{ contract.get_status_display }}<br>
+                {% if contract.start_date %}
+                <strong>Start Date:</strong> {{ contract.start_date|date:"M d, Y" }}<br>
+                {% endif %}
+                {% if contract.end_date %}
+                <strong>End Date:</strong> {{ contract.end_date|date:"M d, Y" }}<br>
+                {% endif %}
+            </div>
+            
+            <h4>Original Contract:</h4>
+            <div class="info-box">
+                <strong>Contract ID:</strong> #{{ parent_contract.id }}<br>
+                <strong>Title:</strong> {{ parent_contract.title }}<br>
+            </div>
+            
+            <p>The renewal contract has been created in DRAFT status. Please review and update as needed before processing.</p>
+            
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{ site_url }}{% url 'contract_detail' contract.pk %}" class="btn">Review Renewal Contract</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 Legal CLM. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

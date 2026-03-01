@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load contract_filters %}
+
+{% block title %}Expired Contracts - Legal CLM{% endblock %}
+{% block page_title %}Expired Contracts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-x-circle"></i> Expired Contracts</h5>
+        </div>
+        <div class="card-body">
+            {% if contracts %}
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>{{ contracts.count }} contract{{ contracts.count|pluralize }}</strong> have expired and may need renewal or termination.
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>Party B</th>
+                            <th>End Date</th>
+                            <th>Days Since Expiry</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contract in contracts %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'contract_detail' contract.pk %}">
+                                    <strong>{{ contract.title }}</strong>
+                                </a>
+                            </td>
+                            <td>{{ contract.get_contract_type_display }}</td>
+                            <td>{{ contract.party_b }}</td>
+                            <td>{{ contract.end_date|date:"M d, Y" }}</td>
+                            <td>
+                                <span class="text-danger">
+                                    {{ contract.days_until_expiry|abs }} days ago
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                <h4 class="mt-3">No expired contracts</h4>
+                <p class="text-muted">Great job keeping your contracts up to date!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

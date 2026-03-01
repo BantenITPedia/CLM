@@ -1,0 +1,11 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/" style="display: inline-block; background-color: #417690; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">
+        ← Back to Application
+    </a>
+</div>
+{{ block.super }}
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Legal CLM{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card primary">
+                <h3>{{ total_contracts }}</h3>
+                <p class="mb-0">Total Contracts</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card success">
+                <h3>{{ active_contracts }}</h3>
+                <p class="mb-0">Active Contracts</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card warning">
+                <h3>{{ expiring_soon_contracts }}</h3>
+                <p class="mb-0">Expiring Soon</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card info">
+                <h3>{{ legal_review_contracts }}</h3>
+                <p class="mb-0">Legal Review</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Expiry Overview -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Expiry Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 class="text-warning">{{ expiring_30 }}</h4>
+                            <p class="text-muted">Expiring in 30 days</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-info">{{ expiring_60 }}</h4>
+                            <p class="text-muted">Expiring in 60 days</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-primary">{{ expiring_90 }}</h4>
+                            <p class="text-muted">Expiring in 90 days</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-danger">{{ expiring_soon_contracts }}</h4>
+                            <p class="text-muted">Expiring Soon</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Two Column Layout -->
+    <div class="row">
+        <!-- Contracts Needing Attention -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Needs Attention</h5>
+                </div>
+                <div class="card-body">
+                    {% if needs_attention %}
+                    <div class="list-group">
+                        {% for contract in needs_attention %}
+                        <a href="{% url 'contract_detail' contract.pk %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ contract.title }}</h6>
+                                <small>
+                                    <span class="badge bg-{{ contract.status|slice:':6' }}">{{ contract.get_status_display }}</span>
+                                </small>
+                            </div>
+                            <p class="mb-1 text-muted small">{{ contract.party_b }}</p>
+                            {% if contract.end_date %}
+                            <small class="text-danger">
+                                <i class="bi bi-calendar"></i> 
+                                {% if contract.days_until_expiry %}
+                                    Expires in {{ contract.days_until_expiry }} days
+                                {% else %}
+                                    Expired
+                                {% endif %}
+                            </small>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3">No contracts need immediate attention</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Contracts -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Contracts</h5>
+                    <a href="{% url 'contract_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if recent_contracts %}
+                    <div class="list-group">
+                        {% for contract in recent_contracts %}
+                        <a href="{% url 'contract_detail' contract.pk %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ contract.title }}</h6>
+                                <small class="text-muted">{{ contract.created_at|date:"M d, Y" }}</small>
+                            </div>
+                            <p class="mb-1 text-muted small">{{ contract.get_contract_type_display }} - {{ contract.party_b }}</p>
+                            <small>
+                                <span class="badge bg-secondary">{{ contract.get_status_display }}</span>
+                            </small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3">No contracts yet</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <a href="{% url 'contract_create' %}" class="btn btn-outline-primary btn-lg w-100">
+                                <i class="bi bi-plus-circle"></i><br>
+                                <small>Create Contract</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{% url 'contract_list' %}" class="btn btn-outline-secondary btn-lg w-100">
+                                <i class="bi bi-list"></i><br>
+                                <small>View All</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{% url 'expiring_contracts' %}" class="btn btn-outline-warning btn-lg w-100">
+                                <i class="bi bi-exclamation-triangle"></i><br>
+                                <small>Expiring Soon</small>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{% url 'terminated_contracts' %}" class="btn btn-outline-danger btn-lg w-100">
+                                <i class="bi bi-x-circle"></i><br>
+                                <small>Terminated</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

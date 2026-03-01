@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #ffc107; color: #000; padding: 20px; text-align: center; }
+        .content { background: #f8f9fa; padding: 20px; }
+        .footer { background: #212529; color: #adb5bd; padding: 15px; text-align: center; font-size: 12px; }
+        .btn { display: inline-block; padding: 10px 20px; background: #ffc107; color: #000; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        .info-box { background: white; padding: 15px; margin: 10px 0; border-left: 4px solid #ffc107; }
+        .warning { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>📝 Signature Required</h2>
+        </div>
+        <div class="content">
+            <h3>Your Signature is Required</h3>
+            <p>A contract requires your digital signature to proceed.</p>
+            
+            <div class="info-box">
+                <strong>Contract ID:</strong> #{{ contract.id }}<br>
+                <strong>Title:</strong> {{ contract.title }}<br>
+                <strong>Type:</strong> {{ contract.get_contract_type_display }}<br>
+                <strong>Status:</strong> {{ contract.get_status_display }}<br>
+            </div>
+            
+            <div class="warning">
+                <strong>Action Required:</strong> Please review and sign this contract at your earliest convenience.
+            </div>
+            
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="{{ site_url }}{% url 'sign_contract' contract.pk %}" class="btn">Sign Contract Now</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 Legal CLM. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
