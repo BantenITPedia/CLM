@@ -4,174 +4,281 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="stat-card primary">
-                <h3>{{ total_contracts }}</h3>
-                <p class="mb-0">Total Contracts</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-card success">
-                <h3>{{ active_contracts }}</h3>
-                <p class="mb-0">Active Contracts</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-card warning">
-                <h3>{{ expiring_soon_contracts }}</h3>
-                <p class="mb-0">Expiring Soon</p>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stat-card info">
-                <h3>{{ legal_review_contracts }}</h3>
-                <p class="mb-0">Legal Review</p>
-            </div>
-        </div>
-    </div>
+<div class="container-fluid px-4 py-3">
     
-    <!-- Expiry Overview -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Expiry Overview</h5>
+    <!-- ============ QUICK STATS (Compact, Always Visible) ============ -->
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="card stat-card-compact primary text-white shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">{{ total_contracts }}</h5>
+                            <small>Total</small>
+                        </div>
+                        <i class="bi bi-file-earmark-text fs-5 opacity-75"></i>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-3">
-                            <h4 class="text-warning">{{ expiring_30 }}</h4>
-                            <p class="text-muted">Expiring in 30 days</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card stat-card-compact success text-white shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">{{ active_contracts }}</h5>
+                            <small>Active</small>
                         </div>
-                        <div class="col-md-3">
-                            <h4 class="text-info">{{ expiring_60 }}</h4>
-                            <p class="text-muted">Expiring in 60 days</p>
+                        <i class="bi bi-check-circle fs-5 opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card stat-card-compact warning text-white shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">{{ expiring_soon_contracts }}</h5>
+                            <small>Expiring</small>
                         </div>
-                        <div class="col-md-3">
-                            <h4 class="text-primary">{{ expiring_90 }}</h4>
-                            <p class="text-muted">Expiring in 90 days</p>
+                        <i class="bi bi-calendar-x fs-5 opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card stat-card-compact info text-white shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">{{ legal_review_contracts }}</h5>
+                            <small>In Review</small>
                         </div>
-                        <div class="col-md-3">
-                            <h4 class="text-danger">{{ expiring_soon_contracts }}</h4>
-                            <p class="text-muted">Expiring Soon</p>
-                        </div>
+                        <i class="bi bi-hourglass-split fs-5 opacity-75"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Two Column Layout -->
-    <div class="row">
-        <!-- Contracts Needing Attention -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Needs Attention</h5>
+
+    <!-- ============ QUICK ACTIONS (Primary, Front-and-Center) ============ -->
+    <div class="row g-2 mb-4">
+        <div class="col-6 col-md-3">
+            <a href="{% url 'contract_create' %}" class="btn btn-primary btn-action shadow-sm d-flex flex-column align-items-center justify-content-center h-100 py-3 rounded-2">
+                <i class="bi bi-plus-circle fs-4 mb-2"></i>
+                <span>Create Contract</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{% url 'contract_list' %}" class="btn btn-secondary btn-action shadow-sm d-flex flex-column align-items-center justify-content-center h-100 py-3 rounded-2">
+                <i class="bi bi-list-ul fs-4 mb-2"></i>
+                <span>View All</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{% url 'expiring_contracts' %}" class="btn btn-warning btn-action shadow-sm d-flex flex-column align-items-center justify-content-center h-100 py-3 rounded-2">
+                <i class="bi bi-exclamation-triangle fs-4 mb-2"></i>
+                <span>Expiring</span>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{% url 'terminated_contracts' %}" class="btn btn-outline-danger btn-action shadow-sm d-flex flex-column align-items-center justify-content-center h-100 py-3 rounded-2">
+                <i class="bi bi-x-circle fs-4 mb-2"></i>
+                <span>Terminated</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- ============ MAIN CONTENT AREA ============ -->
+    <!-- Needs Attention + Recent (2 Column Layout) -->
+    <div class="row g-3 mb-4">
+        <!-- Contracts Needing Attention (Left - Priority) -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-danger bg-opacity-10 border-0 d-flex align-items-center">
+                    <i class="bi bi-exclamation-circle text-danger me-2"></i>
+                    <h6 class="mb-0 text-danger">⚡ Needs Attention</h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
                     {% if needs_attention %}
-                    <div class="list-group">
+                    <div class="list-group list-group-flush">
                         {% for contract in needs_attention %}
-                        <a href="{% url 'contract_detail' contract.pk %}" class="list-group-item list-group-item-action">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ contract.title }}</h6>
-                                <small>
-                                    <span class="badge bg-{{ contract.status|slice:':6' }}">{{ contract.get_status_display }}</span>
+                        <a href="{% url 'contract_detail' contract.pk %}" class="list-group-item list-group-item-action py-3 px-4 border-0">
+                            <div class="d-flex w-100 justify-content-between align-items-start mb-2">
+                                <h6 class="mb-0 fw-bold text-dark" style="flex: 1; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">{{ contract.title }}</h6>
+                                <span class="badge bg-danger ms-2 flex-shrink-0">{{ contract.get_status_display|truncatewords:2 }}</span>
+                            </div>
+                            <small class="text-muted">{{ contract.party_b }}</small>
+                            {% if contract.end_date %}
+                            <div class="mt-2">
+                                <small class="text-danger fw-semibold">
+                                    <i class="bi bi-calendar2-event"></i> 
+                                    {% if contract.days_until_expiry %}
+                                        <span class="badge bg-danger-light text-dark">{{ contract.days_until_expiry }}d</span>
+                                    {% else %}
+                                        Expired
+                                    {% endif %}
                                 </small>
                             </div>
-                            <p class="mb-1 text-muted small">{{ contract.party_b }}</p>
-                            {% if contract.end_date %}
-                            <small class="text-danger">
-                                <i class="bi bi-calendar"></i> 
-                                {% if contract.days_until_expiry %}
-                                    Expires in {{ contract.days_until_expiry }} days
-                                {% else %}
-                                    Expired
-                                {% endif %}
-                            </small>
                             {% endif %}
                         </a>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-muted text-center py-3">No contracts need immediate attention</p>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-check-circle fs-3 d-block mb-2 opacity-50"></i>
+                        <small>All contracts on track</small>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
-        
-        <!-- Recent Contracts -->
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Contracts</h5>
-                    <a href="{% url 'contract_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+
+        <!-- Recent Contracts (Right) -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-info bg-opacity-10 border-0 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 text-info">
+                        <i class="bi bi-clock-history me-2"></i>Recent Activity
+                    </h6>
+                    <a href="{% url 'contract_list' %}" class="btn btn-sm btn-outline-info">View All →</a>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
                     {% if recent_contracts %}
-                    <div class="list-group">
+                    <div class="list-group list-group-flush">
                         {% for contract in recent_contracts %}
-                        <a href="{% url 'contract_detail' contract.pk %}" class="list-group-item list-group-item-action">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ contract.title }}</h6>
-                                <small class="text-muted">{{ contract.created_at|date:"M d, Y" }}</small>
+                        <a href="{% url 'contract_detail' contract.pk %}" class="list-group-item list-group-item-action py-3 px-4 border-0">
+                            <div class="d-flex w-100 justify-content-between align-items-start mb-2">
+                                <h6 class="mb-0 fw-bold text-dark" style="flex: 1; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">{{ contract.title }}</h6>
+                                <small class="text-muted ms-2 flex-shrink-0">{{ contract.created_at|date:"M d" }}</small>
                             </div>
-                            <p class="mb-1 text-muted small">{{ contract.get_contract_type_display }} - {{ contract.party_b }}</p>
-                            <small>
-                                <span class="badge bg-secondary">{{ contract.get_status_display }}</span>
-                            </small>
+                            <small class="text-muted">{{ contract.get_contract_type_display|truncatewords:2 }} • {{ contract.party_b|truncatewords:3 }}</small>
+                            <div class="mt-2">
+                                <span class="badge bg-secondary">{{ contract.get_status_display|truncatewords:2 }}</span>
+                            </div>
                         </a>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-muted text-center py-3">No contracts yet</p>
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                        <small>No contracts yet</small>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Quick Actions -->
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+
+    <!-- ============ EXPIRY TIMELINE (Expandable Info) ============ -->
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary bg-opacity-10 border-0">
+                    <h6 class="mb-0 text-primary">
+                        <i class="bi bi-calendar3 me-2"></i>Upcoming Expirations
+                    </h6>
                 </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-3">
-                            <a href="{% url 'contract_create' %}" class="btn btn-outline-primary btn-lg w-100">
-                                <i class="bi bi-plus-circle"></i><br>
-                                <small>Create Contract</small>
-                            </a>
+                <div class="card-body p-3">
+                    <div class="row g-3 text-center">
+                        <div class="col-6 col-md-3">
+                            <div>
+                                <h5 class="text-danger fw-bold">{{ expiring_30 }}</h5>
+                                <small class="text-muted d-block">Next 30 days</small>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <a href="{% url 'contract_list' %}" class="btn btn-outline-secondary btn-lg w-100">
-                                <i class="bi bi-list"></i><br>
-                                <small>View All</small>
-                            </a>
+                        <div class="col-6 col-md-3">
+                            <div>
+                                <h5 class="text-warning fw-bold">{{ expiring_60 }}</h5>
+                                <small class="text-muted d-block">31-60 days</small>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <a href="{% url 'expiring_contracts' %}" class="btn btn-outline-warning btn-lg w-100">
-                                <i class="bi bi-exclamation-triangle"></i><br>
-                                <small>Expiring Soon</small>
-                            </a>
+                        <div class="col-6 col-md-3">
+                            <div>
+                                <h5 class="text-info fw-bold">{{ expiring_90 }}</h5>
+                                <small class="text-muted d-block">61-90 days</small>
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <a href="{% url 'terminated_contracts' %}" class="btn btn-outline-danger btn-lg w-100">
-                                <i class="bi bi-x-circle"></i><br>
-                                <small>Terminated</small>
-                            </a>
+                        <div class="col-6 col-md-3">
+                            <div>
+                                <h5 class="text-secondary fw-bold">{{ total_contracts }}</h5>
+                                <small class="text-muted d-block">Total contracts</small>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
 </div>
+
+<!-- Custom Dashboard Styling -->
+<style>
+    .stat-card-compact {
+        border: none !important;
+        border-radius: 0.75rem;
+    }
+    
+    .stat-card-compact h5 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    
+    .stat-card-compact small {
+        font-size: 0.75rem;
+        opacity: 0.9;
+    }
+    
+    .btn-action {
+        font-size: 0.9rem;
+        font-weight: 500;
+        border: none;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        color: inherit;
+    }
+    
+    .btn-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
+    }
+    
+    .card {
+        transition: box-shadow 0.2s ease;
+    }
+    
+    .card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1) !important;
+    }
+    
+    .list-group-item {
+        transition: background-color 0.15s ease;
+    }
+    
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    /* Scrollbar styling */
+    .card-body::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .card-body::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .card-body::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 3px;
+    }
+    
+    .card-body::-webkit-scrollbar-thumb:hover {
+        background: #999;
+    }
+</style>
+
 {% endblock %}
