@@ -540,14 +540,6 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    
-    # Enable bulk actions
-    actions = ['delete_selected']
-    
-    def delete_selected(self, request, queryset):
-        """Bulk delete action for users"""
-        return super().delete_selected(request, queryset)
-    delete_selected.short_description = "Delete selected users"
 
 
 @admin.register(Group)
@@ -557,11 +549,3 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
     """
     list_display = ['name']
     search_fields = ['name']
-    
-    # Enable bulk actions
-    actions = ['delete_selected']
-    
-    def delete_selected(self, request, queryset):
-        """Bulk delete action for groups"""
-        return super().delete_selected(request, queryset)
-    delete_selected.short_description = "Delete selected groups"
