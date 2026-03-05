@@ -1,14 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin, GroupAdmin as BaseGroupAdmin
-from unfold.admin import ModelAdmin
 from .models import (
     Contract, ContractParticipant, ContractSignature,
     ContractDocument, AuditLog, Comment,
     ContractField, ContractTemplate, ContractDraft,
     ContractTypeDefinition, ContractData, ContractDataFile,
     ReminderConfiguration, ReminderLog,
-    ContractRolePermission, BusinessEntityDocument, CompanyProfile
+    ContractRolePermission, BusinessEntityDocument, CompanyProfile,
+    DocumentRevisionRequest
 )
 
 # Customize the default admin site
@@ -179,10 +179,12 @@ class ContractAdmin(admin.ModelAdmin):
             'fields': ('contract_value',)
         }),
         ('Dates', {
-            'fields': ('start_date', 'end_date', 'days_until_expiry', 'is_expiring_soon', 'is_expired')
+            'fields': ('start_date', 'end_date', 'duration_days'),
+            'description': 'Specify either end date OR duration in days. If duration is provided with start date, end date will be calculated automatically.'
         }),
         ('Renewal Settings', {
-            'fields': ('renewal_reminder_days', 'auto_renew', 'renewal_period_months', 'parent_contract')
+            'fields': ('renewal_reminder_days', 'renewal_period_months', 'parent_contract'),
+            'classes': ('collapse',)
         }),
         ('Ownership', {
             'fields': ('created_by', 'owner')
@@ -510,13 +512,45 @@ class BusinessEntityDocumentAdmin(admin.ModelAdmin):
         }),)
 
 
-# Unregister and re-register User and Group with Unfold integration
+@admin.register(DocumentRevisionRequest)
+class DocumentRevisionRequestAdmin(admin.ModelAdmin):
+    """
+    Admin interface for document revision requests
+    Track revision requests and approvals from legal reviewers
+    """
+    list_display = ['document', 'status', 'requested_by', 'created_at', 'days_pending']
+    list_filter = ['status', 'created_at']
+    search_fields = ['document__contract__title', 'reason', 'approval_notes']
+    readonly_fields = ['created_at', 'revised_at', 'approved_at', 'days_pending']
+    autocomplete_fields = ['document', 'requested_by', 'revised_by', 'approved_by']
+    
+    fieldsets = (
+        ('Revision Request', {
+            'fields': ('document', 'requested_by', 'reason', 'status', 'created_at')
+        }),
+        ('Revision Upload', {
+            'fields': ('revised_document', 'revised_by', 'revised_at'),
+            'classes': ('collapse',)
+        }),
+        ('Approval', {
+            'fields': ('approved_by', 'approved_at', 'approval_notes'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def days_pending(self, obj):
+        """Show how many days the revision has been pending"""
+        return f"{obj.days_pending} days"
+    days_pending.short_description = "Days Pending"
+
+
+# Unregister and re-register User and Group with custom configuration
 admin.site.unregister(User)
 admin.site.unregister(Group)
 
 
 @admin.register(User)
-class UserAdmin(BaseUserAdmin, ModelAdmin):
+class UserAdmin(BaseUserAdmin):
     """
     Custom User admin with Unfold integration and bulk actions enabled
     """
@@ -543,7 +577,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
 
 
 @admin.register(Group)
-class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+class GroupAdmin(BaseGroupAdmin):
     """
     Custom Group admin with Unfold integration and bulk actions enabled
     """

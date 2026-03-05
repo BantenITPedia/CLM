@@ -13,7 +13,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(','
 # Application definition
 INSTALLED_APPS = [
     # Modern admin theme
-    'unfold',
+    'jazzmin',
     
     'django.contrib.admin',
     'django.contrib.auth',
@@ -112,6 +112,7 @@ EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.conso
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@legalclm.com')
@@ -132,110 +133,56 @@ if not DEBUG:
 LOGIN_URL = 'login'
 
 # ======================
-# UNFOLD ADMIN CONFIGURATION
+# JAZZMIN ADMIN CONFIGURATION
 # ======================
-UNFOLD = {
-    "SITE_HEADER": "Legal CLM - Admin Dashboard",
-    "SITE_TITLE": "Legal CLM",
-    "SITE_URL": "/admin/",
-    "LOGO": None,
-    "FAVICON": None,
-    "COLORS": {
-        "primary": {
-            "50": "f0f9ff",
-            "100": "e0f2fe",
-            "200": "bae6fd",
-            "300": "7dd3fc",
-            "400": "38bdf8",
-            "500": "0ea5e9",
-            "600": "0284c7",
-            "700": "0369a1",
-            "800": "075985",
-            "900": "0c3d66",
-        },
-        "accent": {
-            "50": "f5f3ff",
-            "100": "ede9fe",
-            "200": "ddd6fe",
-            "300": "c4b5fd",
-            "400": "a78bfa",
-            "500": "8b5cf6",
-            "600": "7c3aed",
-            "700": "6d28d9",
-            "800": "5b21b6",
-            "900": "4c1d95",
-        },
-    },
-    "SIDEBAR": {
-        "show_search": True,
-        "show_all_applications": True,
-        "navigation": [
-            {
-                "title": "📋 Contract Management",
-                "items": [
-                    {
-                        "title": "Contracts",
-                        "icon": "description",
-                        "link": "/admin/contracts/contract/",
-                    },
-                    {
-                        "title": "Participants",
-                        "icon": "person",
-                        "link": "/admin/contracts/contractparticipant/",
-                    },
-                    {
-                        "title": "Contract Data",
-                        "icon": "storage",
-                        "link": "/admin/contracts/contractdata/",
-                    },
-                ],
-            },
-            {
-                "title": "⚙️ Configuration",
-                "items": [
-                    {
-                        "title": "Company Profile",
-                        "icon": "business",
-                        "link": "/admin/contracts/companyprofile/",
-                    },
-                    {
-                        "title": "Role Permissions",
-                        "icon": "shield",
-                        "link": "/admin/contracts/contractrolepermission/",
-                    },
-                    {
-                        "title": "Business Documents",
-                        "icon": "file_copy",
-                        "link": "/admin/contracts/businessentitydocument/",
-                    },
-                ],
-            },
-            {
-                "title": "👥 System",
-                "items": [
-                    {
-                        "title": "Users",
-                        "icon": "account_circle",
-                        "link": "/admin/auth/user/",
-                    },
-                    {
-                        "title": "Groups",
-                        "icon": "groups",
-                        "link": "/admin/auth/group/",
-                    },
-                ],
-            },
-            {
-                "title": "📝 Logs",
-                "items": [
-                    {
-                        "title": "Audit Logs",
-                        "icon": "assignment",
-                        "link": "/admin/contracts/auditlog/",
-                    },
-                ],
-            },
-        ],
+JAZZMIN_SETTINGS = {
+    "site_title": "Legal CLM Admin",
+    "site_header": "Legal CLM",
+    "site_brand": "Legal CLM",
+    "welcome_sign": "Welcome to Legal CLM Admin",
+    "custom_js": "admin/js/theme_selector.js",
+    "custom_css": "admin/css/theme_selector.css",
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_models": [
+        "auth.permission",
+    ],
+    "order_with_respect_to": [
+        "contracts",
+        "contracts.contract",
+        "contracts.contracttypedefinition",
+        "contracts.contracttemplate",
+        "contracts.contractfield",
+        "contracts.contractparticipant",
+        "contracts.contractdata",
+        "contracts.contractdatafile",
+        "contracts.contractdraft",
+        "contracts.contractdocument",
+        "contracts.contractsignature",
+        "contracts.comment",
+        "contracts.companyprofile",
+        "contracts.contractrolepermission",
+        "contracts.businessentitydocument",
+        "contracts.reminderlog",
+        "contracts.auditlog",
+        "auth",
+        "auth.user",
+        "auth.group",
+    ],
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "theme": "flatly",
+    "navbar": "navbar-white navbar-light",
+    "sidebar": "sidebar-light-primary",
+    "accent": "accent-primary",
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success",
     },
 }
 LOGIN_REDIRECT_URL = 'dashboard'
