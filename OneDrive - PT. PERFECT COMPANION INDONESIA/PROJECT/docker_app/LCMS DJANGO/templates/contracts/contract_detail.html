@@ -17,6 +17,9 @@
                         <strong>Type:</strong> {{ contract.get_contract_type_display }} |
                         <strong>ID:</strong> #{{ contract.id }}
                     </p>
+                    <p class="text-muted mb-2">
+                        <strong>Contract Number:</strong> {{ contract.contract_number|default:"Not assigned yet" }}
+                    </p>
                     <span class="badge bg-{% if contract.status == 'ACTIVE' %}success{% elif contract.status == 'EXPIRED' %}danger{% elif contract.status == 'EXPIRING_SOON' %}warning{% else %}secondary{% endif %} fs-6">
                         {{ contract.get_status_display }}
                     </span>
@@ -31,10 +34,17 @@
                         <i class="bi bi-pencil"></i> Edit
                     </a>
                     {% endif %}
-                    {% if can_delete %}
+                    {% if can_delete and contract.status == 'DRAFT' or can_delete and contract.status == 'SUBMITTED' %}
                     <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
                         <i class="bi bi-trash"></i> Delete
                     </button>
+                    {% endif %}
+                    {% if can_delete and contract.status != 'DRAFT' and contract.status != 'SUBMITTED' %}
+                    <div class="mt-2">
+                        <small class="text-warning">
+                            Delete is disabled for legal compliance once contract moves beyond Draft/Submitted.
+                        </small>
+                    </div>
                     {% endif %}
                     {% if can_data %}
                     <a href="{% url 'contract_data_input' contract.pk %}" class="btn btn-outline-secondary">
@@ -103,31 +113,6 @@
                         </div>
                         <div class="col-md-6">
                             <strong>Created:</strong> {{ contract.created_at|date:"M d, Y H:i" }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Renewal Settings -->
-            <div class="card mb-3">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Renewal Settings</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <strong>Reminder Days:</strong> {{ contract.renewal_reminder_days }}
-                        </div>
-                        <div class="col-md-4">
-                            <strong>Renewal Period:</strong> {{ contract.renewal_period_months }} months
-                        </div>
-                        <div class="col-md-4">
-                            <strong>Auto-Renew:</strong> 
-                            {% if contract.auto_renew %}
-                                <span class="badge bg-success">Enabled</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Disabled</span>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -348,6 +333,17 @@
                     <form method="post" action="{% url 'update_status' contract.pk %}">
                         {% csrf_token %}
                         {{ status_form.status }}
+                        {% if status_form.show_contract_number_override %}
+                        <div class="mt-2">
+                            <label for="{{ status_form.contract_number_override.id_for_label }}" class="form-label mb-1">
+                                {{ status_form.contract_number_override.label }}
+                            </label>
+                            {{ status_form.contract_number_override }}
+                            <small class="form-text text-muted d-block">
+                                Use only if Legal must assign a specific number. Leave empty for automatic numbering.
+                            </small>
+                        </div>
+                        {% endif %}
                         <button type="submit" class="btn btn-primary w-100 mt-2">
                             <i class="bi bi-check-circle"></i> Update Status
                         </button>
@@ -357,6 +353,29 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if can_assign_contract_number and contract_number_form %}
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-hash"></i> Assign Contract Number</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'assign_contract_number' contract.pk %}">
+                        {% csrf_token %}
+                        <label for="{{ contract_number_form.contract_number.id_for_label }}" class="form-label mb-1">
+                            {{ contract_number_form.contract_number.label }}
+                        </label>
+                        {{ contract_number_form.contract_number }}
+                        <small class="form-text text-muted d-block">
+                            Fill manually if needed, or leave empty and click assign to auto-generate.
+                        </small>
+                        <button type="submit" class="btn btn-outline-primary w-100 mt-2">
+                            <i class="bi bi-check2-square"></i> Assign Contract Number
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Business Entity Documents (from Step 2) -->
             <div class="card mb-3">

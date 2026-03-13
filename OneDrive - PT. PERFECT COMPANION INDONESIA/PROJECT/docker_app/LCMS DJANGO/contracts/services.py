@@ -2,6 +2,8 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils.html import strip_tags
+from django.db import transaction
+from django.utils import timezone
 from .models import AuditLog
 
 
@@ -649,6 +651,77 @@ class ContractTargetService:
         return context
 
 
+class ContractNumberService:
+    """Generate contract numbers with independent running sequences per type/company."""
+
+    TYPE_CODE_MAP = {
+        'GENERAL_TRADE': '01',
+        'GENERAL_TRADE_PREMIUM': '02',
+        'DISTRIBUTOR': '03',
+        'VENDOR': '04',
+    }
+    DEPARTMENT_CODE = 'Sales'
+
+    @classmethod
+    def get_type_code(cls, contract_type):
+        return cls.TYPE_CODE_MAP.get(contract_type)
+
+    @staticmethod
+    def _derive_company_code_from_profile(company):
+        if company and company.short_name:
+            return company.short_name.strip().upper().replace(' ', '')
+
+        if company and company.name:
+            words = [w for w in company.name.strip().split() if w and w[0].isalnum()]
+            if words:
+                return ''.join(word[0].upper() for word in words)[:8]
+
+        return 'PCI'
+
+    @classmethod
+    @transaction.atomic
+    def generate_for_contract(cls, contract):
+        """Generate and return next contract number for a contract."""
+        from .models import ContractNumberSequence, ContractType, CompanyProfile
+
+        type_code = cls.get_type_code(contract.contract_type)
+        if not type_code:
+            raise ValueError('Contract type is not configured for automatic contract numbering.')
+
+        company_key = None
+        company_code = (contract.issuing_company_code or '').strip().upper().replace(' ', '')
+
+        if contract.contract_type == ContractType.VENDOR:
+            company_name = (contract.issuing_company_name or '').strip()
+            if not company_name:
+                raise ValueError('Vendor contracts require issuing company selection before approval.')
+
+            if not company_code:
+                words = [w for w in company_name.split() if w and w[0].isalnum()]
+                company_code = ''.join(word[0].upper() for word in words)[:8] or 'PCI'
+
+            company_key = company_code
+        else:
+            if not company_code:
+                active_company = CompanyProfile.get_active()
+                company_code = cls._derive_company_code_from_profile(active_company)
+
+        year = timezone.now().year
+
+        sequence, _ = ContractNumberSequence.objects.select_for_update().get_or_create(
+            contract_type_code=type_code,
+            year=year,
+            company_key=company_key,
+            defaults={'last_number': 0}
+        )
+
+        sequence.last_number += 1
+        sequence.save(update_fields=['last_number', 'updated_at'])
+
+        running_number = f"{sequence.last_number:03d}"
+        return f"{type_code}.{running_number}/{company_code}/{cls.DEPARTMENT_CODE}/{year}"
+
+
 class TemplateService:
     """Service for loading, validating, and rendering contract templates"""
     
@@ -750,14 +823,21 @@ class TemplateService:
         if not context.get('party_b_registered_address') and context.get('party_b_address'):
             context['party_b_registered_address'] = context.get('party_b_address')
 
+        if not context.get('party_b_representative') and context.get('party_b_representative_name'):
+            context['party_b_representative'] = context.get('party_b_representative_name')
+
+        if not context.get('party_b_representative_name') and context.get('party_b_representative'):
+            context['party_b_representative_name'] = context.get('party_b_representative')
+
         if not context.get('party_b_authorized_representative_name') and context.get('party_b_representative_name'):
             context['party_b_authorized_representative_name'] = context.get('party_b_representative_name')
 
         if not context.get('party_b_authorized_representative_title') and context.get('party_b_representative_title'):
             context['party_b_authorized_representative_title'] = context.get('party_b_representative_title')
 
-        if not context.get('contract_number'):
-            context['contract_number'] = str(contract.id)
+        resolved_contract_number = contract.contract_number or f"DRAFT-{contract.id}"
+        context['contract_number'] = resolved_contract_number
+        context['no_contract'] = resolved_contract_number
 
         # Format dates in Indonesian (DD Bulan YYYY)
         def format_date_indonesian(date_obj):

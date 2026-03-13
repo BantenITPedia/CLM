@@ -19,9 +19,9 @@ from .models import (
 from .forms import (
     ContractForm, ContractStatusUpdateForm, ContractParticipantForm,
     ContractDocumentForm, CommentForm, ContractFilterForm,
-    ContractDataForm, ContractTypeSelectForm
+    ContractDataForm, ContractTypeSelectForm, ContractNumberOverrideForm
 )
-from .services import EmailService
+from .services import EmailService, ContractNumberService
 from .permissions import (
     can_view_contract,
     can_edit_contract,
@@ -36,6 +36,55 @@ from .permissions import (
     get_allowed_next_statuses,
     can_transition_to_status,
 )
+
+
+def _get_template_field_definitions(type_definition):
+    """Return template fields excluding fixed/auto-managed inputs."""
+    field_definitions = type_definition.fields.exclude(
+        field_key__iregex=r'^(contract_number|no_contract|product_types|incentive_percentage)$'
+    )
+
+    if type_definition.code in {ContractType.GENERAL_TRADE, ContractType.GENERAL_TRADE_PREMIUM}:
+        field_definitions = field_definitions.exclude(field_key__iexact='party_b_representative_name')
+
+    return field_definitions.order_by('position', 'label')
+
+
+def _can_assign_contract_number(user, contract):
+    """Allow legal/staff to assign missing contract number from detail page."""
+    if not user or not user.is_authenticated or not contract:
+        return False
+
+    if contract.contract_number:
+        return False
+
+    if contract.status not in {
+        ContractStatus.APPROVED,
+        ContractStatus.SIGNED,
+        ContractStatus.ACTIVE,
+        ContractStatus.EXPIRING_SOON,
+    }:
+        return False
+
+    if not has_contract_permission(user, contract, 'update_status'):
+        return False
+
+    if user.is_staff or user.is_superuser:
+        return True
+
+    return contract.participants.filter(
+        user=user,
+        role='LEGAL',
+        is_active=True
+    ).exists()
+
+
+def _gt_variant_suffix(contract_type_code):
+    if contract_type_code == ContractType.GENERAL_TRADE:
+        return 'regular'
+    if contract_type_code == ContractType.GENERAL_TRADE_PREMIUM:
+        return 'premium'
+    return ''
 
 
 def login_view(request):
@@ -69,6 +118,7 @@ def logout_view(request):
 def dashboard(request):
     """Main dashboard with contract statistics"""
     today = timezone.now().date()
+    review_queue_statuses = [ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW]
     
     # Get user's contracts (or all if staff/admin)
     if request.user.is_staff or request.user.is_superuser:
@@ -82,7 +132,7 @@ def dashboard(request):
     total_contracts = user_contracts.count()
     active_contracts = user_contracts.filter(status__in=[ContractStatus.ACTIVE, ContractStatus.APPROVED]).count()
     expiring_soon_contracts = user_contracts.filter(status=ContractStatus.EXPIRING_SOON).count()
-    legal_review_contracts = user_contracts.filter(status=ContractStatus.LEGAL_REVIEW).count()
+    legal_review_contracts = user_contracts.filter(status__in=review_queue_statuses).count()
     draft_contracts = user_contracts.filter(status=ContractStatus.DRAFT).count()
     
     # Expiring in different periods (APPROVED, ACTIVE or EXPIRING_SOON contracts)
@@ -109,8 +159,7 @@ def dashboard(request):
     
     # Contracts needing attention (in legal review, submitted, expiring, or expiring soon)
     needs_attention = user_contracts.filter(
-        Q(status=ContractStatus.LEGAL_REVIEW) |
-        Q(status=ContractStatus.SUBMITTED) |
+                Q(status__in=review_queue_statuses) |
         Q(status=ContractStatus.EXPIRING_SOON) |
         Q(status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON],
           end_date__gte=today,
@@ -169,6 +218,9 @@ def contract_list(request):
                 Q(party_b__icontains=search) |
                 Q(description__icontains=search)
             )
+
+        if request.GET.get('review_queue') == '1' and not form.cleaned_data.get('status'):
+            contracts = contracts.filter(status__in=[ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW])
     
     context = {
         'contracts': contracts,
@@ -188,10 +240,14 @@ def contract_create(request):
         ).first()
         if not type_def or not type_def.is_template_based:
             return None
-        return type_def.fields.all().order_by('position', 'label')
+        return _get_template_field_definitions(type_def)
 
     def apply_gt_defaults(contract_obj, data_dict):
         from decimal import Decimal
+
+        resolved_contract_number = contract_obj.contract_number or f"DRAFT-{contract_obj.id}"
+        data_dict['contract_number'] = resolved_contract_number
+        data_dict['no_contract'] = resolved_contract_number
 
         if not data_dict.get('party_b_name') and contract_obj.party_b:
             data_dict['party_b_name'] = contract_obj.party_b
@@ -408,7 +464,7 @@ def contract_detail(request, pk):
     # Check if user can upload final document (only after legal approval)
     can_upload_final = (
         has_contract_permission(request.user, contract, 'upload_final_document')
-        and contract.status in [ContractStatus.APPROVED, ContractStatus.ACTIVE]
+        and contract.status in [ContractStatus.APPROVED, ContractStatus.SIGNED]
     )
     
     # Forms
@@ -416,6 +472,8 @@ def contract_detail(request, pk):
     document_form = ContractDocumentForm()
     participant_form = ContractParticipantForm()
     status_form = ContractStatusUpdateForm(instance=contract, user=request.user, contract=contract)
+    can_assign_contract_number = _can_assign_contract_number(request.user, contract)
+    contract_number_form = ContractNumberOverrideForm(contract=contract) if can_assign_contract_number else None
     
     # Final approved document form
     from .forms import FinalApprovedDocumentForm
@@ -433,6 +491,8 @@ def contract_detail(request, pk):
         'document_form': document_form,
         'participant_form': participant_form,
         'status_form': status_form,
+        'can_assign_contract_number': can_assign_contract_number,
+        'contract_number_form': contract_number_form,
         'contract_data': contract_data,
         'all_data_versions': all_data_versions,
         'drafts': drafts,
@@ -458,7 +518,7 @@ def upload_final_document(request, pk):
         messages.error(request, 'You do not have permission to upload the final contract document')
         return redirect('contract_detail', pk=pk)
 
-    if contract.status not in [ContractStatus.APPROVED, ContractStatus.ACTIVE]:
+    if contract.status not in [ContractStatus.APPROVED, ContractStatus.SIGNED]:
         messages.error(request, 'Final signed document can only be uploaded after Legal Approval (Approved status)')
         return redirect('contract_detail', pk=pk)
     
@@ -479,8 +539,8 @@ def upload_final_document(request, pk):
 
             previous_status = contract.status
             status_changed = False
-            if contract.status != ContractStatus.ACTIVE:
-                contract.status = ContractStatus.ACTIVE
+            if contract.status == ContractStatus.APPROVED:
+                contract.status = ContractStatus.SIGNED
                 contract.save(update_fields=['status'])
                 status_changed = True
             
@@ -498,8 +558,8 @@ def upload_final_document(request, pk):
                     action='STATUS_CHANGE',
                     user=request.user,
                     old_value=previous_status,
-                    new_value=ContractStatus.ACTIVE,
-                    details='Status moved to Active after signed final document upload'
+                    new_value=ContractStatus.SIGNED,
+                    details='Status moved to Signed after final document upload'
                 )
 
             EmailService.send_contract_signed_email(contract, request.user)
@@ -574,8 +634,23 @@ def update_contract_status(request, pk):
         
         form = ContractStatusUpdateForm(request.POST, instance=contract, user=request.user, contract=contract)
         if form.is_valid():
+            assigned_contract_number = None
+            manual_contract_number = (form.cleaned_data.get('contract_number_override') or '').strip()
+
+            if new_status == ContractStatus.APPROVED and not contract.contract_number:
+                if manual_contract_number:
+                    assigned_contract_number = manual_contract_number
+                else:
+                    try:
+                        assigned_contract_number = ContractNumberService.generate_for_contract(contract)
+                    except ValueError as error_message:
+                        messages.error(request, str(error_message))
+                        return redirect('contract_detail', pk=pk)
+
             updated_contract = form.save(commit=False)
             updated_contract.status = new_status
+            if assigned_contract_number:
+                updated_contract.contract_number = assigned_contract_number
             updated_contract.save()
 
             new_status_label = updated_contract.get_status_display()
@@ -593,6 +668,21 @@ def update_contract_status(request, pk):
                 EmailService.send_legal_review_email(updated_contract)
             elif new_status == ContractStatus.APPROVED:
                 EmailService.send_contract_approved_email(updated_contract)
+
+                if assigned_contract_number:
+                    assignment_source = 'manual override' if manual_contract_number else 'auto-generated'
+                    AuditLog.objects.create(
+                        contract=updated_contract,
+                        action='UPDATE',
+                        user=request.user,
+                        details=f'Contract number assigned ({assignment_source}): {assigned_contract_number}'
+                    )
+
+                if updated_contract.is_template_based:
+                    try:
+                        _generate_contract_draft(updated_contract, user=request.user, is_regeneration=True)
+                    except Exception:
+                        pass
             elif (
                 new_status == ContractStatus.DRAFT
                 and previous_status in [ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW]
@@ -605,8 +695,63 @@ def update_contract_status(request, pk):
 
             messages.success(request, 'Contract status updated successfully')
         else:
-            messages.error(request, 'Error updating contract status')
+            for field_errors in form.errors.values():
+                for error_text in field_errors:
+                    messages.error(request, str(error_text))
+
+            if not form.errors:
+                messages.error(request, 'Error updating contract status')
     
+    return redirect('contract_detail', pk=pk)
+
+
+@login_required
+def assign_contract_number(request, pk):
+    """Assign contract number manually (or auto when empty input) for legal convenience."""
+    if request.method != 'POST':
+        return redirect('contract_detail', pk=pk)
+
+    contract = get_object_or_404(Contract, pk=pk)
+
+    if not can_view_contract(request.user, contract):
+        messages.error(request, 'You do not have permission to view this contract')
+        return redirect('dashboard')
+
+    if not _can_assign_contract_number(request.user, contract):
+        messages.error(request, 'You do not have permission to assign contract number for this contract')
+        return redirect('contract_detail', pk=pk)
+
+    form = ContractNumberOverrideForm(request.POST, contract=contract)
+    if not form.is_valid():
+        for field_errors in form.errors.values():
+            for error_text in field_errors:
+                messages.error(request, str(error_text))
+        return redirect('contract_detail', pk=pk)
+
+    manual_contract_number = (form.cleaned_data.get('contract_number') or '').strip()
+
+    if manual_contract_number:
+        assigned_contract_number = manual_contract_number
+        assignment_source = 'manual override'
+    else:
+        try:
+            assigned_contract_number = ContractNumberService.generate_for_contract(contract)
+        except ValueError as error_message:
+            messages.error(request, str(error_message))
+            return redirect('contract_detail', pk=pk)
+        assignment_source = 'auto-generated'
+
+    contract.contract_number = assigned_contract_number
+    contract.save()
+
+    AuditLog.objects.create(
+        contract=contract,
+        action='UPDATE',
+        user=request.user,
+        details=f'Contract number assigned ({assignment_source}) via assign form: {assigned_contract_number}'
+    )
+
+    messages.success(request, f'Contract number assigned successfully: {assigned_contract_number}')
     return redirect('contract_detail', pk=pk)
 
 
@@ -715,7 +860,9 @@ def _generate_contract_draft(contract, user=None, is_regeneration=False):
     context_data = TemplateService.build_template_context(contract, contract_data.data)
 
     rendered_html = Template(template.content).render(Context(context_data))
-    file_name = f"contract_{slugify(contract.title)}_draft_v{version}.html"
+    gt_variant = _gt_variant_suffix(contract.contract_type)
+    variant_segment = f"_{gt_variant}" if gt_variant else ""
+    file_name = f"contract_{slugify(contract.title)}{variant_segment}_draft_v{version}.html"
 
     draft = ContractDraft(contract=contract, template=template, version=version)
     draft.file.save(file_name, ContentFile(rendered_html.encode('utf-8')), save=False)
@@ -747,7 +894,7 @@ def contract_data_input(request, pk):
         messages.error(request, 'No contract type definition found for this contract')
         return redirect('contract_detail', pk=pk)
 
-    field_definitions = type_def.fields.all().order_by('position', 'label')
+    field_definitions = _get_template_field_definitions(type_def)
     if not field_definitions:
         if request.user.is_staff:
             messages.warning(request, f'No fields configured for {contract.get_contract_type_display()}. Please add fields in the admin panel first.')
@@ -1102,12 +1249,17 @@ def contract_wizard_step4(request):
         ).first()
         if not type_def or not type_def.is_template_based:
             return None
-        return type_def.fields.all().order_by('position', 'label')
+        return _get_template_field_definitions(type_def)
 
     def apply_gt_defaults(contract_instance, data_dict):
         """Auto-populate GT-specific fields from contract metadata"""
+        from decimal import Decimal
         from datetime import datetime, timedelta
         from dateutil.relativedelta import relativedelta
+
+        resolved_contract_number = contract_instance.contract_number or f"DRAFT-{contract_instance.id}"
+        data_dict['contract_number'] = resolved_contract_number
+        data_dict['no_contract'] = resolved_contract_number
 
         def add_months(start_date, n_months):
             return start_date + relativedelta(months=n_months)
@@ -1126,6 +1278,44 @@ def contract_wizard_step4(request):
             data_dict['party_a_name'] = contract_instance.party_a
         if not data_dict.get('party_b_name'):
             data_dict['party_b_name'] = contract_instance.party_b
+
+        if contract_instance.start_date and not data_dict.get('contract_start_date'):
+            data_dict['contract_start_date'] = contract_instance.start_date.strftime('%Y-%m-%d')
+
+        if contract_instance.end_date and not data_dict.get('contract_end_date'):
+            data_dict['contract_end_date'] = contract_instance.end_date.strftime('%Y-%m-%d')
+
+        if not data_dict.get('business_form'):
+            business_form_map = {
+                'PT': 'Badan Hukum Perseroan Terbatas',
+                'CV': 'CV',
+                'PERORANGAN': 'Usaha Perseorangan',
+            }
+            data_dict['business_form'] = business_form_map.get(
+                contract_instance.business_entity_type,
+                data_dict.get('business_form', '')
+            )
+
+        if contract_instance.contract_value and not data_dict.get('total_purchase_target'):
+            data_dict['total_purchase_target'] = str(contract_instance.contract_value)
+
+        total_target = data_dict.get('total_purchase_target')
+        if total_target:
+            try:
+                total_decimal = Decimal(str(total_target))
+                base_target = total_decimal // Decimal('4')
+                remainder_target = total_decimal - (base_target * 4)
+
+                if not data_dict.get('sales_target_q1'):
+                    data_dict['sales_target_q1'] = str(base_target)
+                if not data_dict.get('sales_target_q2'):
+                    data_dict['sales_target_q2'] = str(base_target)
+                if not data_dict.get('sales_target_q3'):
+                    data_dict['sales_target_q3'] = str(base_target)
+                if not data_dict.get('sales_target_q4'):
+                    data_dict['sales_target_q4'] = str(base_target + remainder_target)
+            except Exception:
+                pass
 
         if contract_instance.contract_value and not data_dict.get('target_value'):
             data_dict['target_value'] = format_currency_idr(contract_instance.contract_value)
@@ -1164,7 +1354,53 @@ def contract_wizard_step4(request):
 
     contract_type_code = contract.contract_type
     field_definitions = get_field_definitions(contract_type_code)
-    
+
+    if field_definitions and contract_type_code in {
+        ContractType.GENERAL_TRADE,
+        ContractType.GENERAL_TRADE_PREMIUM,
+    }:
+        wizard_auto_field_keys = {
+            'party_b_name',
+            'contract_start_date',
+            'contract_end_date',
+            'business_form',
+            'quarter_1_period',
+            'quarter_2_period',
+            'quarter_3_period',
+            'quarter_4_period',
+            'total_purchase_target',
+            'sales_target_q1',
+            'sales_target_q2',
+            'sales_target_q3',
+            'sales_target_q4',
+        }
+        field_definitions = field_definitions.exclude(field_key__in=wizard_auto_field_keys)
+
+    initial_data = apply_gt_defaults(contract, {})
+
+    # Build auto-filled summary for UX display
+    is_gt_contract = contract_type_code in {ContractType.GENERAL_TRADE, ContractType.GENERAL_TRADE_PREMIUM}
+    auto_filled_summary = []
+    if is_gt_contract:
+        AUTO_FILL_LABELS = [
+            ('party_b_name', 'Company Name (Party B)'),
+            ('business_form', 'Business Form'),
+            ('contract_start_date', 'Contract Start Date'),
+            ('contract_end_date', 'Contract End Date'),
+            ('total_purchase_target', 'Total Purchase Target (IDR)'),
+            ('sales_target_q1', 'Sales Target Q1 (IDR)'),
+            ('sales_target_q2', 'Sales Target Q2 (IDR)'),
+            ('sales_target_q3', 'Sales Target Q3 (IDR)'),
+            ('sales_target_q4', 'Sales Target Q4 (IDR)'),
+            ('quarter_1_period', 'Quarter 1 Period'),
+            ('quarter_2_period', 'Quarter 2 Period'),
+            ('quarter_3_period', 'Quarter 3 Period'),
+            ('quarter_4_period', 'Quarter 4 Period'),
+        ]
+        for key, label in AUTO_FILL_LABELS:
+            if initial_data.get(key):
+                auto_filled_summary.append({'label': label, 'value': initial_data[key], 'key': key})
+
     # If no structured data fields defined, skip this step
     if not field_definitions:
         # Clear wizard session data
@@ -1208,15 +1444,14 @@ def contract_wizard_step4(request):
             messages.success(request, f'Contract "{contract.title}" created successfully!')
             return redirect('contract_detail', pk=contract.pk)
     else:
-        data_form = ContractDataForm(field_definitions=field_definitions)
-
-    # Pre-fill with auto-populated data for preview
-    initial_data = apply_gt_defaults(contract, {})
+        data_form = ContractDataForm(field_definitions=field_definitions, initial=initial_data)
     
     context = {
         'contract': contract,
         'data_form': data_form,
         'initial_data': initial_data,
+        'auto_filled_summary': auto_filled_summary,
+        'is_gt_contract': is_gt_contract,
         'step': 4
     }
 

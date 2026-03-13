@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     Contract, ContractParticipant, ContractSignature,
     ContractDocument, FinalApprovedDocument, Comment, ContractType, ContractStatus,
-    ContractTypeDefinition,
+    ContractTypeDefinition, CompanyProfile,
     ParticipantRole
 )
 
@@ -29,10 +29,66 @@ def _build_contract_type_choices(include_blank=False, include_inactive=False, in
 
 
 class ContractForm(forms.ModelForm):
+    issuing_company = forms.ModelChoiceField(
+        queryset=CompanyProfile.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Issuing Company'
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         current_code = self.initial.get('contract_type') or getattr(self.instance, 'contract_type', None)
         self.fields['contract_type'].choices = _build_contract_type_choices(include_code=current_code)
+        self.fields['issuing_company'].queryset = CompanyProfile.objects.all().order_by('name')
+        self.fields['issuing_company'].empty_label = 'Select issuing company (required for Vendor)'
+
+        if not self.is_bound and getattr(self.instance, 'pk', None):
+            existing_company = None
+            if getattr(self.instance, 'issuing_company_code', None):
+                existing_company = CompanyProfile.objects.filter(
+                    short_name__iexact=self.instance.issuing_company_code
+                ).first()
+            if not existing_company and getattr(self.instance, 'issuing_company_name', None):
+                existing_company = CompanyProfile.objects.filter(
+                    name__iexact=self.instance.issuing_company_name
+                ).first()
+            if existing_company:
+                self.fields['issuing_company'].initial = existing_company
+
+    def clean(self):
+        cleaned_data = super().clean()
+        contract_type = cleaned_data.get('contract_type')
+        issuing_company = cleaned_data.get('issuing_company')
+
+        if contract_type == ContractType.VENDOR and not issuing_company:
+            self.add_error('issuing_company', 'Issuing company is required for Vendor Agreement (04).')
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        contract = super().save(commit=False)
+
+        selected_company = self.cleaned_data.get('issuing_company')
+        if selected_company:
+            contract.party_a = selected_company.name
+            contract.issuing_company_name = selected_company.name
+
+            short_name = (selected_company.short_name or '').strip().upper().replace(' ', '')
+            if not short_name:
+                words = [w for w in selected_company.name.split() if w and w[0].isalnum()]
+                short_name = ''.join(word[0].upper() for word in words)[:8]
+
+            contract.issuing_company_code = short_name or 'PCI'
+        else:
+            contract.issuing_company_name = None
+            contract.issuing_company_code = None
+
+        if commit:
+            contract.save()
+            self.save_m2m()
+
+        return contract
 
     class Meta:
         model = Contract
@@ -58,11 +114,29 @@ class ContractForm(forms.ModelForm):
 
 
 class ContractStatusUpdateForm(forms.ModelForm):
+    contract_number_override = forms.CharField(
+        required=False,
+        max_length=64,
+        label='Contract Number Override (Optional)',
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control',
+                'placeholder': 'Leave blank to auto-generate',
+            }
+        ),
+        help_text='Legal can set this manually when approving. Leave empty for automatic numbering.',
+    )
+
     def __init__(self, *args, user=None, contract=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        target_contract = contract or getattr(self, 'instance', None)
+        self.user = user
+        self.target_contract = contract or getattr(self, 'instance', None)
+        self.show_contract_number_override = False
+
+        target_contract = self.target_contract
         if not target_contract or not getattr(target_contract, 'pk', None) or not user:
+            self.fields.pop('contract_number_override', None)
             return
 
         from .permissions import get_allowed_next_statuses
@@ -77,12 +151,93 @@ class ContractStatusUpdateForm(forms.ModelForm):
         if not self.fields['status'].choices:
             self.fields['status'].required = False
 
+        can_override_contract_number = (
+            not target_contract.contract_number
+            and ContractStatus.APPROVED in allowed_statuses
+        )
+
+        if can_override_contract_number:
+            self.show_contract_number_override = True
+        else:
+            self.fields.pop('contract_number_override', None)
+
+    def clean_contract_number_override(self):
+        value = (self.cleaned_data.get('contract_number_override') or '').strip()
+        if not value:
+            return ''
+        return value.upper()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        override_number = (cleaned_data.get('contract_number_override') or '').strip()
+        selected_status = cleaned_data.get('status')
+
+        if not override_number:
+            return cleaned_data
+
+        if selected_status != ContractStatus.APPROVED:
+            self.add_error(
+                'contract_number_override',
+                'Manual contract number can only be set when status is Approved.'
+            )
+            return cleaned_data
+
+        if self.instance and self.instance.contract_number:
+            self.add_error(
+                'contract_number_override',
+                'Contract number is already assigned and cannot be overridden from this action.'
+            )
+            return cleaned_data
+
+        duplicate = Contract.objects.filter(contract_number__iexact=override_number)
+        if self.instance and self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            self.add_error(
+                'contract_number_override',
+                'This contract number is already used by another contract.'
+            )
+
+        return cleaned_data
+
     class Meta:
         model = Contract
         fields = ['status']
         widgets = {
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
+
+
+class ContractNumberOverrideForm(forms.Form):
+    contract_number = forms.CharField(
+        required=False,
+        max_length=64,
+        label='Contract Number (Optional)',
+        widget=forms.TextInput(
+            attrs={
+                'class': 'form-control',
+                'placeholder': 'Leave blank to auto-generate',
+            }
+        ),
+        help_text='Legal may fill manually or leave empty to auto-generate based on sequence.',
+    )
+
+    def __init__(self, *args, contract=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.contract = contract
+
+    def clean_contract_number(self):
+        value = (self.cleaned_data.get('contract_number') or '').strip().upper()
+        if not value:
+            return ''
+
+        duplicate = Contract.objects.filter(contract_number__iexact=value)
+        if self.contract and getattr(self.contract, 'pk', None):
+            duplicate = duplicate.exclude(pk=self.contract.pk)
+        if duplicate.exists():
+            raise forms.ValidationError('This contract number is already used by another contract.')
+
+        return value
 
 
 class ContractTypeSelectForm(forms.Form):
@@ -191,11 +346,18 @@ class ContractFilterForm(forms.Form):
 class ContractDataForm(forms.Form):
     """Dynamic form built from ContractField definitions"""
 
+    LEGACY_MANUAL_NUMBER_KEYS = {'no_contract', 'contract_number'}
+    TEMPLATE_FIXED_KEYS = {'product_types', 'incentive_percentage'}
+    SKIPPED_FIELD_KEYS = LEGACY_MANUAL_NUMBER_KEYS | TEMPLATE_FIXED_KEYS
+
     def __init__(self, *args, **kwargs):
         field_definitions = kwargs.pop('field_definitions', [])
         super().__init__(*args, **kwargs)
 
         for field in field_definitions:
+            if (field.field_key or '').strip().lower() in self.SKIPPED_FIELD_KEYS:
+                continue
+
             common_attrs = {'class': 'form-control', 'placeholder': field.label}
 
             if field.field_type == 'text':
