@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}Company Settings - Legal CLM{% endblock %}
+{% block page_title %}Company Settings{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Company Profile (Party A Information)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>About Company Profile:</strong><br>
+                        This information will be used as the default "Party A" in all contracts. Make sure all details are accurate.
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <h6 class="mb-3 mt-4"><i class="bi bi-info-circle"></i> Basic Information</h6>
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="name" class="form-label">
+                                    Company Name <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       value="{{ company.name }}" required>
+                                <small class="form-text text-muted">Full legal name (e.g., PT. PERFECT COMPANION INDONESIA)</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="short_name" class="form-label">
+                                    Short Name
+                                </label>
+                                <input type="text" class="form-control" id="short_name" name="short_name" 
+                                       value="{{ company.short_name|default:'' }}">
+                                <small class="form-text text-muted">Abbreviated version</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="business_entity_type" class="form-label">
+                                    Business Entity Type <span class="text-danger">*</span>
+                                </label>
+                                <select class="form-control" id="business_entity_type" name="business_entity_type" required>
+                                    {% for value, label in entity_choices %}
+                                    <option value="{{ value }}" {% if company.business_entity_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <h6 class="mb-3 mt-4"><i class="bi bi-file-text"></i> Legal Documents</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="npwp" class="form-label">NPWP</label>
+                                <input type="text" class="form-control" id="npwp" name="npwp" 
+                                       value="{{ company.npwp|default:'' }}"
+                                       placeholder="00.000.000.0-000.000">
+                                <small class="form-text text-muted">Nomor Pokok Wajib Pajak</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="nib" class="form-label">NIB</label>
+                                <input type="text" class="form-control" id="nib" name="nib" 
+                                       value="{{ company.nib|default:'' }}"
+                                       placeholder="0000000000000">
+                                <small class="form-text text-muted">Nomor Induk Berusaha</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="akta_pendirian_number" class="form-label">Akta Pendirian Number</label>
+                                <input type="text" class="form-control" id="akta_pendirian_number" name="akta_pendirian_number" 
+                                       value="{{ company.akta_pendirian_number|default:'' }}">
+                                <small class="form-text text-muted">Certificate number</small>
+                            </div>
+                        </div>
+
+                        <h6 class="mb-3 mt-4"><i class="bi bi-geo-alt"></i> Contact Information</h6>
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Company Address</label>
+                            <textarea class="form-control" id="address" name="address" rows="3">{{ company.address|default:'' }}</textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="phone" class="form-label">Phone</label>
+                                <input type="text" class="form-control" id="phone" name="phone" 
+                                       value="{{ company.phone|default:'' }}"
+                                       placeholder="+62 21 1234567">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="{{ company.email|default:'' }}"
+                                       placeholder="info@company.com">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="website" class="form-label">Website</label>
+                                <input type="url" class="form-control" id="website" name="website" 
+                                       value="{{ company.website|default:'' }}"
+                                       placeholder="https://company.com">
+                            </div>
+                        </div>
+
+                        <h6 class="mb-3 mt-4"><i class="bi bi-person-badge"></i> Legal Representative</h6>
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="legal_representative_name" class="form-label">
+                                    Representative Name
+                                </label>
+                                <input type="text" class="form-control" id="legal_representative_name" 
+                                       name="legal_representative_name" 
+                                       value="{{ company.legal_representative_name|default:'' }}">
+                                <small class="form-text text-muted">Person authorized to sign contracts</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="legal_representative_title" class="form-label">
+                                    Title/Position
+                                </label>
+                                <input type="text" class="form-control" id="legal_representative_title" 
+                                       name="legal_representative_title" 
+                                       value="{{ company.legal_representative_title|default:'' }}"
+                                       placeholder="Direktur Utama">
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if company.updated_at %}
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> Last updated: {{ company.updated_at|date:"M d, Y H:i" }}
+                                    {% if company.updated_by %}
+                                    by {{ company.updated_by.get_full_name|default:company.updated_by.username }}
+                                    {% endif %}
+                                </small>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Info Card -->
+            <div class="card mt-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-question-circle"></i> How This Information is Used</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Party A in Contracts:</strong> This company information will automatically populate as "Party A" when creating new contracts.</p>
+                    <p class="mb-2"><strong>Contract Documents:</strong> Legal representative details will be used in generated contract documents.</p>
+                    <p class="mb-0"><strong>Templates:</strong> Some contract templates may use NPWP, NIB, and address information.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

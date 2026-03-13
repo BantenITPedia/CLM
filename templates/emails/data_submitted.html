@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Data Submitted</title>
+</head>
+<body>
+    <h2>Structured Data Submitted</h2>
+    <p><strong>{{ user.get_full_name|default:user.username }}</strong> submitted data for contract <strong>{{ contract.title }}</strong>.</p>
+    <p>Status has been updated to <strong>{{ contract.get_status_display }}</strong>.</p>
+    <p>
+        <a href="{{ site_url }}/contracts/{{ contract.id }}/" style="background:#0d6efd;color:#fff;padding:10px 16px;text-decoration:none;border-radius:4px;">View Contract</a>
+    </p>
+</body>
+</html>

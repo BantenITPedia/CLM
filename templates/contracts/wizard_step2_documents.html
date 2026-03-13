@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Contract - Step 2{% endblock %}
+{% block page_title %}Create New Contract{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <!-- Progress Indicator -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Contract Creation Progress</h5>
+                    <div class="progress" style="height: 30px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: 66%;" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100">
+                            <strong>Step 2 of 3</strong>
+                        </div>
+                    </div>
+                    <div class="row mt-3 text-center">
+                        <div class="col-4 text-success">
+                            <i class="bi bi-check-circle-fill" style="font-size: 2rem;"></i>
+                            <p class="mb-0 mt-2"><strong>Business Entity</strong></p>
+                            <small class="text-muted">{{ entity_display }}</small>
+                        </div>
+                        <div class="col-4">
+                            <i class="bi bi-files text-primary" style="font-size: 2rem;"></i>
+                            <p class="mb-0 mt-2"><strong>Required Documents</strong></p>
+                        </div>
+                        <div class="col-4 text-muted">
+                            <i class="bi bi-file-text" style="font-size: 2rem;"></i>
+                            <p class="mb-0 mt-2">Contract Details</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2 Form -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-2-circle"></i> Upload Dokumen yang Diperlukan</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Jenis Badan Usaha: {{ entity_display }}</strong><br>
+                        <small>Harap upload semua dokumen yang diperlukan sebelum melanjutkan ke langkah berikutnya.</small>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        {% for field in form %}
+                        <div class="mb-4">
+                            <label for="{{ field.id_for_label }}" class="form-label">
+                                <strong>{{ field.label }}</strong>
+                                {% if field.field.required %}
+                                <span class="text-danger">*</span>
+                                {% else %}
+                                <span class="badge bg-secondary ms-2">Optional</span>
+                                {% endif %}
+                            </label>
+                            
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-file-earmark-arrow-up"></i></span>
+                                {{ field }}
+                            </div>
+                            
+                            {% if field.help_text %}
+                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                            {% endif %}
+                            
+                            {% if field.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ field.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Penting:</strong> Pastikan semua dokumen yang bertanda (*) telah diupload. 
+                            Format file yang diterima: PDF, JPG, JPEG, PNG. Maksimal ukuran file 10MB per dokumen.
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'contract_wizard_step1' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </a>
+                            <div>
+                                <a href="{% url 'contract_wizard_cancel' %}" class="btn btn-outline-danger me-2">
+                                    <i class="bi bi-x-circle"></i> Cancel
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    Next: Contract Details <i class="bi bi-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Document Requirements Table -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-list-check"></i> Daftar Dokumen yang Diperlukan</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Nama Dokumen</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if entity_type == 'PT' or entity_type == 'CV' %}
+                            <tr>
+                                <td>1</td>
+                                <td>Akta Pendirian</td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>NPWP</td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>NIB (Nomor Induk Berusaha)</td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>KTP Penanggung Jawab</td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>Perizinan Lainnya</td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                            </tr>
+                            {% elif entity_type == 'PERORANGAN' %}
+                            <tr>
+                                <td>1</td>
+                                <td>KTP</td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>NPWP</td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

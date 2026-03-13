@@ -1,0 +1,46 @@
+#lcms-theme-switcher {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 9999;
+    width: 180px;
+    background: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    padding: 10px;
+}
+
+#lcms-theme-switcher label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5563;
+    margin-bottom: 6px;
+    letter-spacing: 0.2px;
+}
+
+#lcms-theme-switcher select {
+    width: 100%;
+    min-height: 32px;
+    border: 1px solid #cfd6df;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 13px;
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+#lcms-theme-switcher select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+@media (max-width: 768px) {
+    #lcms-theme-switcher {
+        right: 12px;
+        bottom: 12px;
+        width: 160px;
+    }
+}
