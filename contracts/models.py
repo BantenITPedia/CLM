@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from datetime import timedelta
 
 
@@ -66,83 +67,6 @@ class ContractPermission(models.TextChoices):
     ADD_COMMENT = 'add_comment', 'Add comments'
     EDIT_STRUCTURED_DATA = 'edit_structured_data', 'Edit structured data'
     REGENERATE_DRAFT = 'regenerate_draft', 'Regenerate drafts'
-
-
-class CompanyProfile(models.Model):
-    """
-    Store company/organization information used as Party A in contracts
-    Singleton pattern - typically only one company profile per system
-    """
-    name = models.CharField(
-        max_length=255,
-        unique=True,
-        verbose_name="Company Legal Name",
-        help_text="Full legal name of your company (e.g., PT. ABC Indonesia)"
-    )
-    
-    # Company Details
-    business_entity_type = models.CharField(
-        max_length=20,
-        choices=BusinessEntityType.choices,
-        verbose_name="Business Entity Type",
-        help_text="PT, CV, or Perorangan"
-    )
-    
-    address = models.TextField(
-        verbose_name="Business Address",
-        help_text="Full address of the company"
-    )
-    
-    phone = models.CharField(
-        max_length=20,
-        blank=True,
-        help_text="Contact phone number"
-    )
-    
-    email = models.EmailField(
-        blank=True,
-        help_text="Contact email address"
-    )
-    
-    # Business Registration Documents
-    npwp = models.CharField(
-        max_length=50,
-        blank=True,
-        verbose_name="NPWP",
-        help_text="Tax identification number"
-    )
-    
-    nib = models.CharField(
-        max_length=50,
-        blank=True,
-        verbose_name="NIB",
-        help_text="Business registration number"
-    )
-    
-    # Documents
-    registration_document = models.FileField(
-        upload_to='company/documents/',
-        blank=True,
-        null=True,
-        help_text="Company registration document (e.g., Akta Pendirian)"
-    )
-    
-    # Metadata
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = "Company Profile"
-        verbose_name_plural = "Company Profile"
-    
-    def __str__(self):
-        return self.name
-    
-    @classmethod
-    def get_instance(cls):
-        """Get or create the default company profile (singleton pattern)"""
-        instance, created = cls.objects.get_or_create(pk=1)
-        return instance
 
 
 class ContractTypeDefinition(models.Model):
@@ -1186,6 +1110,187 @@ class DocumentRevisionRequest(models.Model):
         """Calculate days since revision was requested"""
         from django.utils import timezone
         return (timezone.now() - self.created_at).days
+
+
+# ---------------------------------------------------------------------------
+# EMAIL SETTINGS — configurable via admin, stored in DB
+# ---------------------------------------------------------------------------
+
+class EmailSettings(models.Model):
+    """
+    SMTP / API email configuration manageable from the admin panel.
+    Singleton-style: only one record can be active at a time.
+    Falls back to settings.py values when no active DB config exists.
+    """
+    class Provider(models.TextChoices):
+        SMTP = 'SMTP', 'SMTP'
+        SENDGRID = 'SENDGRID', 'SendGrid API'
+        RESEND = 'RESEND', 'Resend API'
+
+    name = models.CharField(
+        max_length=100,
+        default='Default Email Settings',
+        help_text="Friendly label for this configuration"
+    )
+    provider = models.CharField(
+        max_length=20,
+        choices=Provider.choices,
+        default=Provider.SMTP,
+        help_text="Choose SMTP or API provider"
+    )
+    host = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="SMTP host (e.g. smtp.gmail.com)"
+    )
+    port = models.IntegerField(
+        default=587,
+        help_text="SMTP port (587 for TLS, 465 for SSL)"
+    )
+    username = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Sender email / SMTP login"
+    )
+    password = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="SMTP password or app password"
+    )
+    api_key = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="API key for provider (required for SendGrid/Resend API)"
+    )
+    api_endpoint = models.URLField(
+        blank=True,
+        default='https://api.sendgrid.com/v3/mail/send',
+        help_text="Email API endpoint URL (auto-defaulted by selected provider if left blank)"
+    )
+    use_tls = models.BooleanField(
+        default=True,
+        help_text="Enable STARTTLS (port 587)"
+    )
+    use_ssl = models.BooleanField(
+        default=False,
+        help_text="Enable SSL (port 465). Mutually exclusive with TLS."
+    )
+    default_from_email = models.EmailField(
+        help_text="Default From: address for all outgoing emails"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Only one EmailSettings can be active at a time"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Email Settings"
+        verbose_name_plural = "Email Settings"
+        ordering = ['-is_active', '-updated_at']
+
+    def __str__(self):
+        endpoint = self.host if self.provider == self.Provider.SMTP else self.provider
+        return f"{self.name} ({endpoint}) {'[ACTIVE]' if self.is_active else ''}"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        if self.is_active:
+            EmailSettings.objects.exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        errors = {}
+
+        if self.provider == self.Provider.SMTP:
+            if not self.host:
+                errors['host'] = 'SMTP host is required when provider is SMTP.'
+            if not self.username:
+                errors['username'] = 'SMTP username is required when provider is SMTP.'
+            if not self.password:
+                errors['password'] = 'SMTP password is required when provider is SMTP.'
+        elif self.provider in (self.Provider.SENDGRID, self.Provider.RESEND):
+            if not self.api_key:
+                errors['api_key'] = f'API key is required when provider is {self.provider}.'
+
+            # Auto-fill endpoint if omitted for API providers.
+            if not self.api_endpoint:
+                if self.provider == self.Provider.SENDGRID:
+                    self.api_endpoint = 'https://api.sendgrid.com/v3/mail/send'
+                elif self.provider == self.Provider.RESEND:
+                    self.api_endpoint = 'https://api.resend.com/emails'
+
+        if self.use_tls and self.use_ssl:
+            errors['use_ssl'] = 'use_tls and use_ssl cannot both be enabled at the same time.'
+
+        if errors:
+            raise ValidationError(errors)
+
+    @classmethod
+    def get_active(cls):
+        return cls.objects.filter(is_active=True).first()
+
+
+# ---------------------------------------------------------------------------
+# IN-APP NOTIFICATION
+# ---------------------------------------------------------------------------
+
+class NotificationType(models.TextChoices):
+    CONTRACT_CREATED  = 'CONTRACT_CREATED',  'Contract Created'
+    STATUS_CHANGED    = 'STATUS_CHANGED',    'Status Changed'
+    PARTICIPANT_ADDED = 'PARTICIPANT_ADDED', 'Added to Contract'
+    SIGNATURE_REQUIRED = 'SIGNATURE_REQUIRED', 'Signature Required'
+    APPROVAL_REQUIRED = 'APPROVAL_REQUIRED', 'Approval Required'
+    CONTRACT_APPROVED = 'CONTRACT_APPROVED', 'Contract Approved'
+    CONTRACT_ACTIVATED = 'CONTRACT_ACTIVATED', 'Contract Activated'
+    CONTRACT_EXPIRING = 'CONTRACT_EXPIRING', 'Contract Expiring'
+    DRAFT_GENERATED   = 'DRAFT_GENERATED',   'Draft Generated'
+    COMMENT_ADDED     = 'COMMENT_ADDED',     'Comment Added'
+    RENEWAL_CREATED   = 'RENEWAL_CREATED',   'Renewal Created'
+    DOCUMENT_REVISION = 'DOCUMENT_REVISION', 'Document Revision'
+    LEGAL_REVIEW      = 'LEGAL_REVIEW',      'Legal Review Required'
+
+
+class Notification(models.Model):
+    """
+    In-app notification for a specific user.
+    Created automatically by signals/services when contract events occur.
+    Each recipient of a contract event gets their own Notification row.
+    Emails are also sent to all related parties using existing HTML templates.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        help_text="Recipient of this notification"
+    )
+    contract = models.ForeignKey(
+        'Contract',
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        null=True,
+        blank=True
+    )
+    notification_type = models.CharField(
+        max_length=30,
+        choices=NotificationType.choices,
+        default=NotificationType.CONTRACT_CREATED
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    link = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"[{self.notification_type}] {self.title} → {self.user.username}"
 
 
 class CompanyProfile(models.Model):

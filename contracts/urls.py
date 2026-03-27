@@ -49,4 +49,11 @@ urlpatterns = [
     # Settings
     path('settings/company/', views.company_settings, name='company_settings'),
     path('settings/permissions/', views.permission_matrix, name='permission_matrix'),
+    path('settings/email/health-check/', views.email_health_check, name='email_health_check'),
+
+    # Notifications
+    path('notifications/', views.notifications_list, name='notifications_list'),
+    path('notifications/json/', views.notifications_json, name='notifications_json'),
+    path('notifications/<int:pk>/read/', views.mark_notification_read, name='mark_notification_read'),
+    path('notifications/read-all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
 ]

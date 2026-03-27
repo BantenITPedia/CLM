@@ -1534,6 +1534,94 @@ def company_settings(request):
 
 
 @login_required
+def email_health_check(request):
+    """
+    Validate currently active email provider configuration.
+    Returns JSON status for quick operational checks.
+    """
+    if not request.user.is_staff:
+        return JsonResponse({'ok': False, 'error': 'Forbidden'}, status=403)
+
+    import requests
+    from django.core.mail import get_connection
+    from .models import EmailSettings
+
+    cfg = EmailSettings.get_active()
+    if not cfg:
+        return JsonResponse({
+            'ok': False,
+            'error': 'No active EmailSettings found',
+            'checked_at': timezone.now().isoformat(),
+        }, status=400)
+
+    try:
+        if cfg.provider == EmailSettings.Provider.SMTP:
+            conn = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=cfg.host,
+                port=cfg.port,
+                username=cfg.username,
+                password=cfg.password,
+                use_tls=cfg.use_tls,
+                use_ssl=cfg.use_ssl,
+                fail_silently=False,
+            )
+            opened = conn.open()
+            conn.close()
+            return JsonResponse({
+                'ok': bool(opened),
+                'provider': cfg.provider,
+                'message': 'SMTP connection opened successfully' if opened else 'SMTP connection could not be opened',
+                'checked_at': timezone.now().isoformat(),
+            })
+
+        if cfg.provider == EmailSettings.Provider.SENDGRID:
+            response = requests.get(
+                'https://api.sendgrid.com/v3/user/profile',
+                headers={'Authorization': f'Bearer {cfg.api_key}'},
+                timeout=15,
+            )
+            ok = response.status_code == 200
+            return JsonResponse({
+                'ok': ok,
+                'provider': cfg.provider,
+                'status_code': response.status_code,
+                'message': 'SendGrid credentials are valid' if ok else response.text[:300],
+                'checked_at': timezone.now().isoformat(),
+            }, status=200 if ok else 400)
+
+        if cfg.provider == EmailSettings.Provider.RESEND:
+            response = requests.get(
+                'https://api.resend.com/domains',
+                headers={'Authorization': f'Bearer {cfg.api_key}'},
+                timeout=15,
+            )
+            ok = response.status_code == 200
+            return JsonResponse({
+                'ok': ok,
+                'provider': cfg.provider,
+                'status_code': response.status_code,
+                'message': 'Resend credentials are valid' if ok else response.text[:300],
+                'checked_at': timezone.now().isoformat(),
+            }, status=200 if ok else 400)
+
+        return JsonResponse({
+            'ok': False,
+            'provider': cfg.provider,
+            'error': 'Unsupported provider',
+            'checked_at': timezone.now().isoformat(),
+        }, status=400)
+
+    except Exception as exc:
+        return JsonResponse({
+            'ok': False,
+            'provider': cfg.provider,
+            'error': str(exc),
+            'checked_at': timezone.now().isoformat(),
+        }, status=500)
+
+
+@login_required
 def permission_matrix(request):
     """
     Display role-permission matrix for staff users
@@ -1835,3 +1923,64 @@ def reject_revised_document(request, contract_id, revision_request_id):
     }
     return render(request, 'contracts/reject_revised_document.html', context)
 
+
+# ---------------------------------------------------------------------------
+# In-App Notification Views
+# ---------------------------------------------------------------------------
+
+@login_required
+def notifications_json(request):
+    """Return the current user's recent unread notifications as JSON (for bell dropdown)."""
+    from .models import Notification
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:20]
+    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+    data = [
+        {
+            'id': n.pk,
+            'type': n.notification_type,
+            'title': n.title,
+            'message': n.message,
+            'link': n.link,
+            'is_read': n.is_read,
+            'created_at': n.created_at.strftime('%d %b %Y %H:%M'),
+        }
+        for n in qs
+    ]
+    return JsonResponse({'notifications': data, 'unread_count': unread_count})
+
+
+@login_required
+def notifications_list(request):
+    """Full paginated page of the current user's notifications."""
+    from .models import Notification
+    from django.core.paginator import Paginator
+    qs = Notification.objects.filter(user=request.user).order_by('-created_at')
+    paginator = Paginator(qs, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    # Mark all displayed as read when the user visits this page
+    ids_on_page = [n.pk for n in page_obj.object_list if not n.is_read]
+    if ids_on_page:
+        Notification.objects.filter(pk__in=ids_on_page).update(is_read=True)
+    return render(request, 'contracts/notifications_list.html', {
+        'page_obj': page_obj,
+        'unread_count': Notification.objects.filter(user=request.user, is_read=False).count(),
+    })
+
+
+@login_required
+def mark_notification_read(request, pk):
+    """Mark a single notification as read (POST or GET, returns JSON)."""
+    from .models import Notification
+    notif = get_object_or_404(Notification, pk=pk, user=request.user)
+    notif.is_read = True
+    notif.save(update_fields=['is_read'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def mark_all_notifications_read(request):
+    """Mark all notifications for the current user as read."""
+    from .models import Notification
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return JsonResponse({'ok': True})

@@ -8,15 +8,22 @@ app = Celery('legal_clm')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
+# Keep startup retry behavior explicit for Celery 6+ compatibility.
+app.conf.broker_connection_retry_on_startup = True
+
 # Celery Beat Schedule
 app.conf.beat_schedule = {
-    'check-contract-expiry-daily': {
-        'task': 'contracts.tasks.check_contract_expiry',
+    'update-expiring-contracts-daily': {
+        'task': 'contracts.tasks.update_expiring_contracts',
+        'schedule': crontab(hour=8, minute=0),  # Run daily at 8 AM
+    },
+    'schedule-reminders-daily': {
+        'task': 'contracts.tasks.schedule_reminders',
         'schedule': crontab(hour=9, minute=0),  # Run daily at 9 AM
     },
-    'send-renewal-reminders': {
-        'task': 'contracts.tasks.send_renewal_reminders',
-        'schedule': crontab(hour=10, minute=0),  # Run daily at 10 AM
+    'send-reminders-hourly': {
+        'task': 'contracts.tasks.send_reminders',
+        'schedule': crontab(minute=0),  # Run every hour
     },
 }
 

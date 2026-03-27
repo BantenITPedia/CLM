@@ -155,6 +155,30 @@
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">{% block page_title %}Dashboard{% endblock %}</span>
             <div class="d-flex align-items-center">
+                <!-- Notification Bell -->
+                <div class="dropdown me-3" id="notif-dropdown">
+                    <a href="#" id="notifBtn" class="position-relative text-dark text-decoration-none"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-bell fs-5"></i>
+                        <span id="notif-badge"
+                              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                              style="display:none;font-size:10px;">0</span>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end shadow p-0"
+                         style="min-width:360px;max-height:480px;overflow-y:auto;">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                            <strong>Notifications</strong>
+                            <a href="#" id="mark-all-read" class="small text-primary text-decoration-none">Mark all read</a>
+                        </div>
+                        <ul id="notif-list" class="list-unstyled mb-0">
+                            <li class="px-3 py-2 text-muted small">Loading…</li>
+                        </ul>
+                        <div class="border-top text-center py-2">
+                            <a href="{% url 'notifications_list' %}" class="small text-primary text-decoration-none">View all notifications</a>
+                        </div>
+                    </div>
+                </div>
+
                 <span class="me-3">
                     <i class="bi bi-person-circle"></i> 
                     {{ user.get_full_name|default:user.username }}
@@ -180,7 +204,88 @@
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
+    {% if user.is_authenticated %}
+    <script>
+    (function () {
+        'use strict';
+
+        function loadNotifications() {
+            fetch("{% url 'notifications_json' %}", {credentials: 'same-origin'})
+                .then(function(r){ return r.json(); })
+                .then(function(data) {
+                    var badge = document.getElementById('notif-badge');
+                    var list  = document.getElementById('notif-list');
+                    if (!badge || !list) return;
+
+                    // Update badge
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+                        badge.style.display = '';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+
+                    // Render items
+                    if (data.notifications.length === 0) {
+                        list.innerHTML = '<li class="px-3 py-2 text-muted small">No notifications</li>';
+                        return;
+                    }
+                    list.innerHTML = data.notifications.map(function(n) {
+                        return '<li class="border-bottom' + (n.is_read ? '' : ' bg-light') + '">' +
+                            '<a href="' + (n.link || '#') + '" class="d-block px-3 py-2 text-decoration-none text-dark notif-item" data-id="' + n.id + '">' +
+                            '<div class="small fw-semibold">' + escapeHtml(n.title) + '</div>' +
+                            '<div class="small text-muted">' + escapeHtml(n.message) + '</div>' +
+                            '<div class="text-muted" style="font-size:11px;">' + n.created_at + '</div>' +
+                            '</a></li>';
+                    }).join('');
+
+                    // Mark individual notification read on click
+                    list.querySelectorAll('.notif-item').forEach(function(el) {
+                        el.addEventListener('click', function() {
+                            var id = el.dataset.id;
+                            fetch('/notifications/' + id + '/read/', {
+                                method: 'POST',
+                                credentials: 'same-origin',
+                                headers: {'X-CSRFToken': getCookie('csrftoken')}
+                            });
+                        });
+                    });
+                })
+                .catch(function(e){ console.warn('Notification fetch error', e); });
+        }
+
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function getCookie(name) {
+            var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+            return v ? v[2] : null;
+        }
+
+        // Mark-all-read button
+        var markAll = document.getElementById('mark-all-read');
+        if (markAll) {
+            markAll.addEventListener('click', function(e) {
+                e.preventDefault();
+                fetch("{% url 'mark_all_notifications_read' %}", {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'X-CSRFToken': getCookie('csrftoken')}
+                }).then(function() { loadNotifications(); });
+            });
+        }
+
+        // Load on page load and every 30 seconds
+        loadNotifications();
+        setInterval(loadNotifications, 30000);
+    })();
+    </script>
+    {% endif %}
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

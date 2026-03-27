@@ -8,3 +8,5 @@ python-decouple==3.8
 Pillow==10.2.0
 reportlab==4.1.0
 django-jazzmin>=2.6.0
+requests==2.32.3
+chardet==5.2.0

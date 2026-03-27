@@ -8,7 +8,8 @@ from .models import (
     ContractTypeDefinition, ContractData, ContractDataFile,
     ReminderConfiguration, ReminderLog,
     ContractRolePermission, BusinessEntityDocument, CompanyProfile,
-    DocumentRevisionRequest, ContractNumberSequence
+    DocumentRevisionRequest, ContractNumberSequence,
+    EmailSettings, Notification,
 )
 
 # Customize the default admin site
@@ -587,3 +588,138 @@ class GroupAdmin(BaseGroupAdmin):
     """
     list_display = ['name']
     search_fields = ['name']
+
+
+@admin.register(EmailSettings)
+class EmailSettingsAdmin(admin.ModelAdmin):
+    """
+    Admin interface for configuring SMTP email settings.
+    Only one configuration can be active at a time.
+    """
+    list_display = ['name', 'provider', 'host', 'port', 'username', 'masked_api_key', 'is_active']
+    list_filter = ['provider', 'is_active', 'use_tls', 'use_ssl']
+    search_fields = ['name', 'host', 'username', 'default_from_email']
+    readonly_fields = ['masked_api_key']
+
+    fieldsets = (
+        ('Configuration Name', {
+            'fields': ('name', 'provider', 'is_active'),
+            'description': 'Only one configuration can be active at a time. '
+                           'Activating this will deactivate all others.',
+        }),
+        ('API Provider', {
+            'fields': ('masked_api_key', 'api_key', 'api_endpoint'),
+            'description': 'Used when provider = SendGrid API or Resend API.',
+            'classes': ('collapse',),
+        }),
+        ('SMTP Server', {
+            'fields': ('host', 'port', 'use_tls', 'use_ssl'),
+        }),
+        ('Authentication', {
+            'fields': ('username', 'password'),
+        }),
+        ('Sender', {
+            'fields': ('default_from_email',),
+        }),
+    )
+
+    actions = ['send_test_email']
+
+    class Media:
+        js = ('admin/js/email_settings_admin.js',)
+
+    def masked_api_key(self, obj):
+        if not obj or not obj.api_key:
+            return '-'
+        if len(obj.api_key) <= 6:
+            return '*' * len(obj.api_key)
+        return f"{'*' * (len(obj.api_key) - 4)}{obj.api_key[-4:]}"
+    masked_api_key.short_description = 'API Key (masked)'
+
+    def send_test_email(self, request, queryset):
+        """Send a test email using the selected configuration."""
+        from django.core.mail import send_mail
+        from django.core.mail.backends.smtp import EmailBackend
+        import requests
+        sent = 0
+        for cfg in queryset:
+            try:
+                if cfg.provider == 'SENDGRID':
+                    response = requests.post(
+                        cfg.api_endpoint or 'https://api.sendgrid.com/v3/mail/send',
+                        headers={
+                            'Authorization': f'Bearer {cfg.api_key}',
+                            'Content-Type': 'application/json',
+                        },
+                        json={
+                            'personalizations': [{'to': [{'email': request.user.email}]}],
+                            'from': {'email': cfg.default_from_email},
+                            'subject': 'LCMS - Email API Test',
+                            'content': [
+                                {'type': 'text/plain', 'value': 'This is a SendGrid API test email from LCMS Admin.'},
+                            ],
+                        },
+                        timeout=20,
+                    )
+                    if response.status_code not in (200, 202):
+                        raise RuntimeError(f'SendGrid API failed ({response.status_code}): {response.text[:300]}')
+                elif cfg.provider == 'RESEND':
+                    response = requests.post(
+                        cfg.api_endpoint or 'https://api.resend.com/emails',
+                        headers={
+                            'Authorization': f'Bearer {cfg.api_key}',
+                            'Content-Type': 'application/json',
+                        },
+                        json={
+                            'from': cfg.default_from_email,
+                            'to': [request.user.email],
+                            'subject': 'LCMS - Email API Test',
+                            'text': 'This is a Resend API test email from LCMS Admin.',
+                        },
+                        timeout=20,
+                    )
+                    if response.status_code not in (200, 201, 202):
+                        raise RuntimeError(f'Resend API failed ({response.status_code}): {response.text[:300]}')
+                else:
+                    conn = EmailBackend(
+                        host=cfg.host, port=cfg.port,
+                        username=cfg.username, password=cfg.password,
+                        use_tls=cfg.use_tls, use_ssl=cfg.use_ssl,
+                        fail_silently=False,
+                    )
+                    send_mail(
+                        subject='LCMS – Email Settings Test',
+                        message='This is a test email from LCMS Admin.',
+                        from_email=cfg.default_from_email,
+                        recipient_list=[request.user.email],
+                        connection=conn,
+                    )
+                sent += 1
+            except Exception as exc:
+                self.message_user(request, f"Failed for '{cfg.name}': {exc}", level='error')
+        if sent:
+            self.message_user(request, f"Test email sent to {request.user.email} for {sent} configuration(s).")
+    send_test_email.short_description = 'Send test email to my account'
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    """
+    Read-only admin view for in-app notifications.
+    """
+    list_display = ['user', 'notification_type', 'title', 'contract', 'is_read', 'created_at']
+    list_filter = ['notification_type', 'is_read', 'created_at']
+    search_fields = ['user__username', 'user__email', 'title', 'message', 'contract__title']
+    readonly_fields = ['user', 'contract', 'notification_type', 'title', 'message',
+                       'is_read', 'link', 'created_at']
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return True  # allow admins to purge old notifications

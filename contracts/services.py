@@ -4,28 +4,158 @@ from django.conf import settings
 from django.utils.html import strip_tags
 from django.db import transaction
 from django.utils import timezone
+import logging
+import requests
 from .models import AuditLog
 
 
 class EmailService:
     """Centralized email service for all contract-related emails"""
-    
+
+    logger = logging.getLogger(__name__)
+
+    @staticmethod
+    def _get_email_settings():
+        """Return active EmailSettings row or None."""
+        try:
+            from .models import EmailSettings
+            return EmailSettings.get_active()
+        except Exception:
+            return None
+
+    @staticmethod
+    def _get_email_connection():
+        """
+        Return (connection, from_email) using DB EmailSettings if active,
+        otherwise fall back to Django settings.py values.
+        """
+        from django.core.mail import get_connection
+        db_cfg = EmailService._get_email_settings()
+
+        if db_cfg and getattr(db_cfg, 'provider', 'SMTP') == 'SMTP':
+            conn = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=db_cfg.host,
+                port=db_cfg.port,
+                username=db_cfg.username,
+                password=db_cfg.password,
+                use_tls=db_cfg.use_tls,
+                use_ssl=db_cfg.use_ssl,
+                fail_silently=False,
+            )
+            return conn, db_cfg.default_from_email
+        return None, settings.DEFAULT_FROM_EMAIL
+
+    @staticmethod
+    def _send_via_sendgrid(subject, html_message, plain_message, recipient_list, from_email):
+        """Send message using SendGrid Web API."""
+        db_cfg = EmailService._get_email_settings()
+        if not db_cfg or db_cfg.provider != 'SENDGRID' or not db_cfg.api_key:
+            raise ValueError('Active SendGrid configuration with api_key is required')
+
+        personalizations = [{'to': [{'email': email}]} for email in recipient_list if email]
+        payload = {
+            'personalizations': personalizations,
+            'from': {'email': from_email},
+            'subject': subject,
+            'content': [
+                {'type': 'text/plain', 'value': plain_message or ''},
+                {'type': 'text/html', 'value': html_message or ''},
+            ],
+        }
+
+        response = requests.post(
+            db_cfg.api_endpoint or 'https://api.sendgrid.com/v3/mail/send',
+            headers={
+                'Authorization': f'Bearer {db_cfg.api_key}',
+                'Content-Type': 'application/json',
+            },
+            json=payload,
+            timeout=20,
+        )
+        if response.status_code not in (200, 202):
+            raise RuntimeError(f'SendGrid API failed: {response.status_code} {response.text[:300]}')
+        return True
+
+    @staticmethod
+    def _send_via_resend(subject, html_message, plain_message, recipient_list, from_email):
+        """Send message using Resend Web API."""
+        db_cfg = EmailService._get_email_settings()
+        if not db_cfg or db_cfg.provider != 'RESEND' or not db_cfg.api_key:
+            raise ValueError('Active Resend configuration with api_key is required')
+
+        payload = {
+            'from': from_email,
+            'to': recipient_list,
+            'subject': subject,
+            'text': plain_message or '',
+            'html': html_message or '',
+        }
+
+        response = requests.post(
+            db_cfg.api_endpoint or 'https://api.resend.com/emails',
+            headers={
+                'Authorization': f'Bearer {db_cfg.api_key}',
+                'Content-Type': 'application/json',
+            },
+            json=payload,
+            timeout=20,
+        )
+        if response.status_code not in (200, 201, 202):
+            raise RuntimeError(f'Resend API failed: {response.status_code} {response.text[:300]}')
+        return True
+
+    @staticmethod
+    def _send_with_provider(subject, html_message, plain_message, recipient_list):
+        """Send with configured provider; fallback to SMTP when enabled."""
+        clean_recipients = list(set(filter(None, recipient_list)))
+        if not clean_recipients:
+            return False
+
+        db_cfg = EmailService._get_email_settings()
+        from_email = db_cfg.default_from_email if db_cfg else settings.DEFAULT_FROM_EMAIL
+
+        if db_cfg and db_cfg.provider in ('SENDGRID', 'RESEND'):
+            try:
+                if db_cfg.provider == 'SENDGRID':
+                    return EmailService._send_via_sendgrid(
+                        subject=subject,
+                        html_message=html_message,
+                        plain_message=plain_message,
+                        recipient_list=clean_recipients,
+                        from_email=from_email,
+                    )
+                return EmailService._send_via_resend(
+                    subject=subject,
+                    html_message=html_message,
+                    plain_message=plain_message,
+                    recipient_list=clean_recipients,
+                    from_email=from_email,
+                )
+            except Exception as api_error:
+                # User requested SMTP fallback if API fails.
+                EmailService.logger.warning('%s API failed; falling back to SMTP: %s', db_cfg.provider, api_error)
+
+        connection, smtp_from = EmailService._get_email_connection()
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=smtp_from,
+            recipient_list=clean_recipients,
+            html_message=html_message,
+            fail_silently=False,
+            connection=connection,
+        )
+        return True
+
     @staticmethod
     def _send_email(subject, template_name, context, recipient_list):
-        """Helper method to send emails"""
+        """Helper method to send HTML emails"""
         try:
             html_message = render_to_string(template_name, context)
             plain_message = strip_tags(html_message)
-            
-            send_mail(
-                subject=subject,
-                message=plain_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=recipient_list,
-                html_message=html_message,
-                fail_silently=False,
-            )
-            
+            EmailService._send_with_provider(subject, html_message, plain_message, recipient_list)
+
             # Log email sent
             if 'contract' in context:
                 AuditLog.objects.create(
@@ -33,7 +163,7 @@ class EmailService:
                     action='EMAIL_SENT',
                     details=f"Email sent: {subject} to {', '.join(recipient_list)}"
                 )
-            
+
             return True
         except Exception as e:
             print(f"Email sending failed: {e}")
@@ -47,13 +177,7 @@ class EmailService:
             return False
 
         try:
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=clean_recipients,
-                fail_silently=False,
-            )
+            EmailService._send_with_provider(subject, None, message, clean_recipients)
 
             if contract:
                 AuditLog.objects.create(
@@ -66,6 +190,7 @@ class EmailService:
         except Exception as e:
             print(f"Email sending failed: {e}")
             return False
+
     
     @staticmethod
     def _get_participant_emails(contract, roles=None, notification_filter='critical'):
@@ -521,6 +646,27 @@ class EmailService:
         }
         
         return cls._send_email(subject, template_name, context, recipients)
+
+    @classmethod
+    def send_comment_email(cls, comment, contract):
+        """Send email when a comment is added to a contract"""
+        subject = f"New Comment on Contract: {contract.title}"
+        template_name = 'emails/comment_added.html'
+        context = {
+            'contract': contract,
+            'comment': comment,
+            'commenter': comment.user.get_full_name() or comment.user.username if comment.user else 'Unknown',
+            'site_url': settings.SITE_URL,
+        }
+        # Send to all active participants (excluding the commenter)
+        recipients = cls._get_participant_emails(contract)
+        # Remove commenter's email if they're a participant
+        if comment.user and comment.user.email:
+            recipients = [e for e in recipients if e != comment.user.email]
+        
+        if recipients:
+            return cls._send_email(subject, template_name, context, recipients)
+        return True
 
 
 class ContractTargetService:
@@ -1316,6 +1462,57 @@ class DocumentVersionService:
 
         return document
 
+
+class NotificationService:
+    """
+    Creates in-app Notification rows and optionally sends emails to all related
+    contract participants using existing EmailService methods.
+    """
+
+    @staticmethod
+    def notify_contract_participants(contract, notification_type, title, message,
+                                     send_email=True, email_method=None):
+        """
+        Create an in-app Notification for every active participant that has a
+        linked user account.  Optionally fire email_method(contract).
+        """
+        from .models import Notification
+        participants = contract.participants.filter(is_active=True, user__isnull=False)
+        for p in participants:
+            Notification.objects.get_or_create(
+                user=p.user,
+                contract=contract,
+                notification_type=notification_type,
+                title=title,
+                defaults={
+                    'message': message,
+                    'link': f'/contracts/{contract.pk}/',
+                    'is_read': False,
+                },
+            )
+        if send_email and email_method:
+            try:
+                email_method(contract)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(
+                    "NotificationService email error for contract %s: %s", contract.pk, e
+                )
+
+    @staticmethod
+    def notify_user(user, contract, notification_type, title, message, link=''):
+        """Create a single in-app notification for one specific user."""
+        from .models import Notification
+        Notification.objects.create(
+            user=user,
+            contract=contract,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            link=link or (f'/contracts/{contract.pk}/' if contract else ''),
+        )
+
+
 class ReminderService:
     """
     Service layer for automated email reminders as defined in core_clm_spec.md
@@ -1363,6 +1560,18 @@ class ReminderService:
             configs = configs.filter(reminder_type=reminder_type)
         
         for config in configs:
+            # Build candidate statuses defensively because some deployments may
+            # not define a dedicated PENDING_SIGNATURE status in ContractStatus.
+            candidate_statuses = [
+                ContractStatus.ACTIVE,
+                ContractStatus.SIGNED,
+                ContractStatus.EXPIRING_SOON,
+            ]
+            if hasattr(ContractStatus, 'PENDING_SIGNATURE'):
+                candidate_statuses.append(ContractStatus.PENDING_SIGNATURE)
+            else:
+                candidate_statuses.append(ContractStatus.APPROVED)
+
             # Get contracts to check
             if config.scope == 'CONTRACT':
                 # Single contract override
@@ -1373,13 +1582,11 @@ class ReminderService:
                     continue
                 contracts = Contract.objects.filter(
                     contract_type=config.contract_type.code,
-                    status__in=[ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE, 
-                               ContractStatus.SIGNED, ContractStatus.EXPIRING_SOON]
+                    status__in=candidate_statuses
                 )
             else:  # GLOBAL
                 contracts = Contract.objects.filter(
-                    status__in=[ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE,
-                               ContractStatus.SIGNED, ContractStatus.EXPIRING_SOON]
+                    status__in=candidate_statuses
                 )
             
             # Check each contract against this configuration
