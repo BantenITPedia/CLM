@@ -7,8 +7,7 @@ from .models import (
     ReminderConfiguration, ReminderLog,
     ContractRolePermission,
     ContractTarget, ContractQuarter,
-    FinalApprovedDocument, BusinessEntityDocument,
-    DocumentRevisionRequest, CompanyProfile,
+    FinalApprovedDocument, CompanyProfile,
 )
 
 # Customize the default admin site
@@ -407,43 +406,6 @@ class FinalApprovedDocumentAdmin(admin.ModelAdmin):
     list_filter = ['uploaded_at']
     search_fields = ['contract__title']
     readonly_fields = ['uploaded_at']
-
-
-# ---------------------------------------------------------------------------
-# Business Entity Documents & Revision Requests
-# ---------------------------------------------------------------------------
-
-@admin.register(BusinessEntityDocument)
-class BusinessEntityDocumentAdmin(admin.ModelAdmin):
-    list_display = ['contract', 'document_type', 'uploaded_by', 'uploaded_at']
-    list_filter = ['document_type', 'uploaded_at']
-    search_fields = ['contract__title']
-    readonly_fields = ['uploaded_at']
-
-
-@admin.register(DocumentRevisionRequest)
-class DocumentRevisionRequestAdmin(admin.ModelAdmin):
-    list_display = ['document', 'requested_by', 'status', 'created_at', 'days_pending']
-    list_filter = ['status', 'created_at']
-    search_fields = ['document__contract__title', 'reason']
-    readonly_fields = ['created_at', 'days_pending', 'revised_at', 'approved_at']
-
-    fieldsets = (
-        ('Request Details', {
-            'fields': ('document', 'requested_by', 'reason', 'status', 'created_at', 'days_pending')
-        }),
-        ('Revision', {
-            'fields': ('revised_at', 'revised_document', 'revised_by'),
-            'classes': ('collapse',)
-        }),
-        ('Approval', {
-            'fields': ('approved_at', 'approved_by', 'approval_notes'),
-            'classes': ('collapse',)
-        }),
-    )
-
-    def has_add_permission(self, request):
-        return False
 
 
 # ---------------------------------------------------------------------------
