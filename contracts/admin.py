@@ -5,7 +5,11 @@ from .models import (
     ContractField, ContractTemplate, ContractDraft,
     ContractTypeDefinition, ContractData, ContractDataFile,
     ReminderConfiguration, ReminderLog,
-    ContractRolePermission
+    ContractRolePermission,
+    ContractNumberSequence, ContractTarget, ContractQuarter,
+    FinalApprovedDocument, BusinessEntityDocument,
+    DocumentRevisionRequest, EmailSettings,
+    Notification, CompanyProfile,
 )
 
 # Customize the default admin site
@@ -336,6 +340,202 @@ class ReminderLogAdmin(admin.ModelAdmin):
         'scheduled_date', 'sent_date', 'recipients',
         'status', 'error_message', 'email_subject',
         'created_at', 'updated_at'
+    ]
+    
+    fieldsets = (
+        ('Reminder Details', {
+            'fields': (
+                'reminder_config',
+                'contract',
+                ('reminder_type', 'status'),
+                'email_subject'
+            )
+        }),
+        ('Schedule & Delivery', {
+            'fields': (
+                ('scheduled_date', 'sent_date'),
+                'recipients'
+            )
+        }),
+        ('Error Information', {
+            'fields': ('error_message',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        """ReminderLogs are created by tasks, not manually"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Preserve audit trail"""
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        """Logs are read-only"""
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Contract Number Sequence
+# ---------------------------------------------------------------------------
+
+@admin.register(ContractNumberSequence)
+class ContractNumberSequenceAdmin(admin.ModelAdmin):
+    list_display = ['contract_type_code', 'year', 'company_key', 'last_number', 'updated_at']
+    list_filter = ['contract_type_code', 'year']
+    search_fields = ['contract_type_code', 'company_key']
+    readonly_fields = ['updated_at']
+
+
+# ---------------------------------------------------------------------------
+# Contract Target & Quarter (Sales Agreements)
+# ---------------------------------------------------------------------------
+
+@admin.register(ContractTarget)
+class ContractTargetAdmin(admin.ModelAdmin):
+    list_display = ['contract', 'annual_target', 'created_at', 'updated_at']
+    search_fields = ['contract__title']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(ContractQuarter)
+class ContractQuarterAdmin(admin.ModelAdmin):
+    list_display = ['contract', 'quarter_number', 'start_date', 'end_date', 'target_amount']
+    list_filter = ['quarter_number']
+    search_fields = ['contract__title']
+
+
+# ---------------------------------------------------------------------------
+# Final Approved Document
+# ---------------------------------------------------------------------------
+
+@admin.register(FinalApprovedDocument)
+class FinalApprovedDocumentAdmin(admin.ModelAdmin):
+    list_display = ['contract', 'uploaded_by', 'uploaded_at']
+    list_filter = ['uploaded_at']
+    search_fields = ['contract__title']
+    readonly_fields = ['uploaded_at']
+
+
+# ---------------------------------------------------------------------------
+# Business Entity Documents & Revision Requests
+# ---------------------------------------------------------------------------
+
+@admin.register(BusinessEntityDocument)
+class BusinessEntityDocumentAdmin(admin.ModelAdmin):
+    list_display = ['contract', 'document_type', 'uploaded_by', 'uploaded_at']
+    list_filter = ['document_type', 'uploaded_at']
+    search_fields = ['contract__title']
+    readonly_fields = ['uploaded_at']
+
+
+@admin.register(DocumentRevisionRequest)
+class DocumentRevisionRequestAdmin(admin.ModelAdmin):
+    list_display = ['document', 'requested_by', 'status', 'created_at', 'days_pending']
+    list_filter = ['status', 'created_at']
+    search_fields = ['document__contract__title', 'reason']
+    readonly_fields = ['created_at', 'days_pending', 'revised_at', 'approved_at']
+
+    fieldsets = (
+        ('Request Details', {
+            'fields': ('document', 'requested_by', 'reason', 'status', 'created_at', 'days_pending')
+        }),
+        ('Revision', {
+            'fields': ('revised_at', 'revised_document', 'revised_by'),
+            'classes': ('collapse',)
+        }),
+        ('Approval', {
+            'fields': ('approved_at', 'approved_by', 'approval_notes'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Email Settings (singleton-style)
+# ---------------------------------------------------------------------------
+
+@admin.register(EmailSettings)
+class EmailSettingsAdmin(admin.ModelAdmin):
+    list_display = ['name', 'provider', 'host', 'default_from_email', 'is_active', 'updated_at']
+    list_filter = ['provider', 'is_active']
+    search_fields = ['name', 'host', 'username']
+    readonly_fields = ['created_at', 'updated_at']
+
+    fieldsets = (
+        ('General', {
+            'fields': ('name', 'provider', 'is_active', 'default_from_email')
+        }),
+        ('SMTP Configuration', {
+            'fields': ('host', 'port', 'username', 'password', 'use_tls', 'use_ssl'),
+            'classes': ('collapse',),
+            'description': 'Required when Provider = SMTP'
+        }),
+        ('API Configuration', {
+            'fields': ('api_key', 'api_endpoint'),
+            'classes': ('collapse',),
+            'description': 'Required when Provider = SendGrid or Resend'
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+# ---------------------------------------------------------------------------
+# In-App Notifications
+# ---------------------------------------------------------------------------
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['user', 'notification_type', 'title', 'contract', 'is_read', 'created_at']
+    list_filter = ['notification_type', 'is_read', 'created_at']
+    search_fields = ['user__username', 'user__email', 'title', 'message', 'contract__title']
+    readonly_fields = ['created_at']
+    list_editable = ['is_read']
+
+    def has_add_permission(self, request):
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Company Profile (Party A singleton)
+# ---------------------------------------------------------------------------
+
+@admin.register(CompanyProfile)
+class CompanyProfileAdmin(admin.ModelAdmin):
+    list_display = ['name', 'short_name', 'business_entity_type', 'email', 'phone', 'is_active']
+    list_filter = ['business_entity_type', 'is_active']
+    search_fields = ['name', 'short_name', 'npwp', 'nib']
+    readonly_fields = ['created_at', 'updated_at']
+
+    fieldsets = (
+        ('Company Identity', {
+            'fields': ('name', 'short_name', 'business_entity_type', 'is_active')
+        }),
+        ('Legal Documents', {
+            'fields': ('npwp', 'nib', 'akta_pendirian_number')
+        }),
+        ('Contact Information', {
+            'fields': ('address', 'phone', 'email', 'website')
+        }),
+        ('Legal Representative', {
+            'fields': ('legal_representative_name', 'legal_representative_title')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
     ]
     
     fieldsets = (
