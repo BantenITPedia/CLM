@@ -536,8 +536,16 @@ class CompanyProfileAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-    ]
-    
+
+
+# ---------------------------------------------------------------------------
+# Reminder Log Admin
+# ---------------------------------------------------------------------------
+
+class ReminderLogAdmin(admin.ModelAdmin):
+    """
+    Read-only admin view for reminder delivery logs
+    """
     fieldsets = (
         ('Reminder Details', {
             'fields': (
