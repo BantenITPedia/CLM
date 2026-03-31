@@ -80,9 +80,11 @@ services:
     image: nginx:alpine
     container_name: clm-nginx
     ports:
-    - 8001
+    - "80:80"
+    - "443:443"
     volumes:
     - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+    - ./ssl:/etc/nginx/ssl:ro
     - clm_static_volume:/app/staticfiles:ro
     - clm_media_volume:/app/media:ro
     networks:
