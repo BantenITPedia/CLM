@@ -7,7 +7,6 @@ from .models import (
     ReminderConfiguration, ReminderLog,
     ContractRolePermission,
     ContractTarget, ContractQuarter,
-    FinalApprovedDocument, CompanyProfile,
 )
 
 # Customize the default admin site
@@ -394,53 +393,6 @@ class ContractQuarterAdmin(admin.ModelAdmin):
     list_display = ['contract', 'quarter_number', 'start_date', 'end_date', 'target_amount']
     list_filter = ['quarter_number']
     search_fields = ['contract__title']
-
-
-# ---------------------------------------------------------------------------
-# Final Approved Document
-# ---------------------------------------------------------------------------
-
-@admin.register(FinalApprovedDocument)
-class FinalApprovedDocumentAdmin(admin.ModelAdmin):
-    list_display = ['contract', 'uploaded_by', 'uploaded_at']
-    list_filter = ['uploaded_at']
-    search_fields = ['contract__title']
-    readonly_fields = ['uploaded_at']
-
-
-# ---------------------------------------------------------------------------
-# In-App Notifications
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Company Profile (Party A singleton)
-# ---------------------------------------------------------------------------
-
-@admin.register(CompanyProfile)
-class CompanyProfileAdmin(admin.ModelAdmin):
-    list_display = ['name', 'short_name', 'business_entity_type', 'email', 'phone', 'is_active']
-    list_filter = ['business_entity_type', 'is_active']
-    search_fields = ['name', 'short_name', 'npwp', 'nib']
-    readonly_fields = ['created_at', 'updated_at']
-
-    fieldsets = (
-        ('Company Identity', {
-            'fields': ('name', 'short_name', 'business_entity_type', 'is_active')
-        }),
-        ('Legal Documents', {
-            'fields': ('npwp', 'nib', 'akta_pendirian_number')
-        }),
-        ('Contact Information', {
-            'fields': ('address', 'phone', 'email', 'website')
-        }),
-        ('Legal Representative', {
-            'fields': ('legal_representative_name', 'legal_representative_title')
-        }),
-        ('Metadata', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
 
 
 # ---------------------------------------------------------------------------
