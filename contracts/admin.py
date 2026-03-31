@@ -6,10 +6,9 @@ from .models import (
     ContractTypeDefinition, ContractData, ContractDataFile,
     ReminderConfiguration, ReminderLog,
     ContractRolePermission,
-    ContractNumberSequence, ContractTarget, ContractQuarter,
+    ContractTarget, ContractQuarter,
     FinalApprovedDocument, BusinessEntityDocument,
-    DocumentRevisionRequest, EmailSettings,
-    Notification, CompanyProfile,
+    DocumentRevisionRequest, CompanyProfile,
 )
 
 # Customize the default admin site
@@ -381,18 +380,6 @@ class ReminderLogAdmin(admin.ModelAdmin):
 
 
 # ---------------------------------------------------------------------------
-# Contract Number Sequence
-# ---------------------------------------------------------------------------
-
-@admin.register(ContractNumberSequence)
-class ContractNumberSequenceAdmin(admin.ModelAdmin):
-    list_display = ['contract_type_code', 'year', 'company_key', 'last_number', 'updated_at']
-    list_filter = ['contract_type_code', 'year']
-    search_fields = ['contract_type_code', 'company_key']
-    readonly_fields = ['updated_at']
-
-
-# ---------------------------------------------------------------------------
 # Contract Target & Quarter (Sales Agreements)
 # ---------------------------------------------------------------------------
 
@@ -460,52 +447,8 @@ class DocumentRevisionRequestAdmin(admin.ModelAdmin):
 
 
 # ---------------------------------------------------------------------------
-# Email Settings (singleton-style)
-# ---------------------------------------------------------------------------
-
-@admin.register(EmailSettings)
-class EmailSettingsAdmin(admin.ModelAdmin):
-    list_display = ['name', 'provider', 'host', 'default_from_email', 'is_active', 'updated_at']
-    list_filter = ['provider', 'is_active']
-    search_fields = ['name', 'host', 'username']
-    readonly_fields = ['created_at', 'updated_at']
-
-    fieldsets = (
-        ('General', {
-            'fields': ('name', 'provider', 'is_active', 'default_from_email')
-        }),
-        ('SMTP Configuration', {
-            'fields': ('host', 'port', 'username', 'password', 'use_tls', 'use_ssl'),
-            'classes': ('collapse',),
-            'description': 'Required when Provider = SMTP'
-        }),
-        ('API Configuration', {
-            'fields': ('api_key', 'api_endpoint'),
-            'classes': ('collapse',),
-            'description': 'Required when Provider = SendGrid or Resend'
-        }),
-        ('Metadata', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-
-
-# ---------------------------------------------------------------------------
 # In-App Notifications
 # ---------------------------------------------------------------------------
-
-@admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-    list_display = ['user', 'notification_type', 'title', 'contract', 'is_read', 'created_at']
-    list_filter = ['notification_type', 'is_read', 'created_at']
-    search_fields = ['user__username', 'user__email', 'title', 'message', 'contract__title']
-    readonly_fields = ['created_at']
-    list_editable = ['is_read']
-
-    def has_add_permission(self, request):
-        return False
-
 
 # ---------------------------------------------------------------------------
 # Company Profile (Party A singleton)
