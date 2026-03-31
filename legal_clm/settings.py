@@ -137,6 +137,27 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
 
+# Avoid COOP warning on non-trustworthy HTTP origins during IP-based access.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+
+# Emit request exceptions to container logs so intermittent 500s are traceable.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    },
+}
+
 # Login URLs
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
