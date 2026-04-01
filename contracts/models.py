@@ -964,6 +964,8 @@ class NotificationEmailTemplate(models.Model):
 
     class Meta:
         ordering = ['event_key']
+        verbose_name = 'Notification Email Template'
+        verbose_name_plural = 'Notification Email Templates'
 
     def __str__(self):
         return f"{self.event_key} - {'Enabled' if self.enabled else 'Disabled'}"
@@ -1005,6 +1007,8 @@ class EmailSettings(models.Model):
 
     class Meta:
         ordering = ['-is_active', '-updated_at']
+        verbose_name = 'Email Provider Settings'
+        verbose_name_plural = 'Email Provider Settings'
 
     def __str__(self):
         status = 'Active' if self.is_active else 'Inactive'
