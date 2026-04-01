@@ -71,7 +71,6 @@ services:
     - .:/app
     - static_volume:/app/staticfiles
     - media_volume:/app/media
-version: '3.8'
 volumes:
   media_volume: null
   postgres_data: null

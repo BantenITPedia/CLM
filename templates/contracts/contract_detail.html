@@ -17,6 +17,9 @@
                         <strong>Type:</strong> {{ contract.get_contract_type_display }} |
                         <strong>ID:</strong> #{{ contract.id }}
                     </p>
+                    <p class="text-muted mb-2">
+                        <strong>Contract Number:</strong> {{ contract.contract_number|default:"Not assigned yet" }}
+                    </p>
                     <span class="badge bg-{% if contract.status == 'ACTIVE' %}success{% elif contract.status == 'EXPIRED' %}danger{% elif contract.status == 'EXPIRING_SOON' %}warning{% else %}secondary{% endif %} fs-6">
                         {{ contract.get_status_display }}
                     </span>
@@ -31,10 +34,17 @@
                         <i class="bi bi-pencil"></i> Edit
                     </a>
                     {% endif %}
-                    {% if can_delete %}
+                    {% if can_delete and contract.status == 'DRAFT' or can_delete and contract.status == 'SUBMITTED' %}
                     <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
                         <i class="bi bi-trash"></i> Delete
                     </button>
+                    {% endif %}
+                    {% if can_delete and contract.status != 'DRAFT' and contract.status != 'SUBMITTED' %}
+                    <div class="mt-2">
+                        <small class="text-warning">
+                            Delete is disabled for legal compliance once contract moves beyond Draft/Submitted.
+                        </small>
+                    </div>
                     {% endif %}
                     {% if can_data %}
                     <a href="{% url 'contract_data_input' contract.pk %}" class="btn btn-outline-secondary">
@@ -82,9 +92,9 @@
                         </div>
                         <div class="col-md-6">
                             <strong>Contract Duration:</strong>
-                            {% if contract.contract_duration_display %}
+                            {% if contract.duration_days %}
                                 <span class="badge bg-info">
-                                    {{ contract.contract_duration_display }}
+                                    {{ contract.duration_days }} days
                                 </span>
                             {% else %}
                                 -
@@ -103,31 +113,6 @@
                         </div>
                         <div class="col-md-6">
                             <strong>Created:</strong> {{ contract.created_at|date:"M d, Y H:i" }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Renewal Settings -->
-            <div class="card mb-3">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Renewal Settings</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <strong>Reminder Days:</strong> {{ contract.renewal_reminder_days }}
-                        </div>
-                        <div class="col-md-4">
-                            <strong>Renewal Period:</strong> {{ contract.renewal_period_months }} months
-                        </div>
-                        <div class="col-md-4">
-                            <strong>Auto-Renew:</strong> 
-                            {% if contract.auto_renew %}
-                                <span class="badge bg-success">Enabled</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Disabled</span>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -344,58 +329,244 @@
                     <h5 class="mb-0"><i class="bi bi-arrows-angle-contract"></i> Update Status</h5>
                 </div>
                 <div class="card-body">
-                    {% has_contract_permission user contract 'update_status' as can_update_status %}
                     {% if can_update_status %}
                     <form method="post" action="{% url 'update_status' contract.pk %}">
                         {% csrf_token %}
                         {{ status_form.status }}
+                        {% if status_form.show_contract_number_override %}
+                        <div class="mt-2">
+                            <label for="{{ status_form.contract_number_override.id_for_label }}" class="form-label mb-1">
+                                {{ status_form.contract_number_override.label }}
+                            </label>
+                            {{ status_form.contract_number_override }}
+                            <small class="form-text text-muted d-block">
+                                Use only if Legal must assign a specific number. Leave empty for automatic numbering.
+                            </small>
+                        </div>
+                        {% endif %}
                         <button type="submit" class="btn btn-primary w-100 mt-2">
                             <i class="bi bi-check-circle"></i> Update Status
                         </button>
                     </form>
                     {% else %}
-                    <p class="text-muted small mb-0">You do not have permission to update status.</p>
+                    <p class="text-muted small mb-0">No status transition available for your role at this stage.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if can_assign_contract_number and contract_number_form %}
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-hash"></i> Assign Contract Number</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'assign_contract_number' contract.pk %}">
+                        {% csrf_token %}
+                        <label for="{{ contract_number_form.contract_number.id_for_label }}" class="form-label mb-1">
+                            {{ contract_number_form.contract_number.label }}
+                        </label>
+                        {{ contract_number_form.contract_number }}
+                        <small class="form-text text-muted d-block">
+                            Fill manually if needed, or leave empty and click assign to auto-generate.
+                        </small>
+                        <button type="submit" class="btn btn-outline-primary w-100 mt-2">
+                            <i class="bi bi-check2-square"></i> Assign Contract Number
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Business Entity Documents (from Step 2) -->
+            <div class="card mb-3">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-building"></i> Business Entity Documents</h5>
+                </div>
+                <div class="card-body">
+                    {% if business_entity_documents %}
+                    <p class="text-muted small mb-3">Documents submitted for business verification:</p>
+                    {% for doc in business_entity_documents %}
+                    <div class="mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div style="flex: 1;">
+                                <strong class="d-block">{{ doc.get_document_type_display }}</strong>
+                                <small class="text-muted">{{ doc.uploaded_at|date:"M d, Y H:i" }} - Uploaded by {{ doc.uploaded_by.get_full_name|default:doc.uploaded_by.username }}</small>
+                                
+                                <!-- Show Pending Revision Requests -->
+                                {% for revision in doc.revision_requests.all %}
+                                    {% if revision.status == 'pending' %}
+                                    <div class="alert alert-warning mt-2 mb-0 py-2">
+                                        <strong><i class="bi bi-exclamation-circle"></i> Revision Requested</strong><br>
+                                        <small>Reason: {{ revision.reason }}</small><br>
+                                        <small class="text-muted">Requested {{ revision.created_at|timesince }} ago by {{ revision.requested_by.get_full_name|default:revision.requested_by.username }}</small>
+                                    </div>
+                                    {% elif revision.status == 'revised' %}
+                                    <div class="alert alert-info mt-2 mb-0 py-2">
+                                        <strong><i class="bi bi-hourglass"></i> Awaiting Approval</strong><br>
+                                        <small>Revised document uploaded, waiting for legal review</small><br>
+                                        <small class="text-muted">Revised {{ revision.revised_at|timesince }} ago by {{ revision.revised_by.get_full_name|default:revision.revised_by.username }}</small>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="d-flex flex-column gap-2">
+                                {% if doc.document %}
+                                <a href="{{ doc.document.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-download"></i> View
+                                </a>
+                                {% endif %}
+                                
+                                <!-- Request Revision button (for legal reviewers) - Show only if no pending revisions exist -->
+                                {% if can_update_status and contract.status == 'LEGAL_REVIEW' %}
+                                    {% if doc.id not in open_revision_document_ids %}
+                                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#requestRevisionModal" data-document-id="{{ doc.id }}" data-document-type="{{ doc.get_document_type_display }}">
+                                        <i class="bi bi-arrow-repeat"></i> Request Revision
+                                    </button>
+                                    {% endif %}
+                                {% endif %}
+                                
+                                <!-- Upload Revised Document button (for document owner) -->
+                                {% for revision in doc.revision_requests.all %}
+                                    {% if revision.status == 'pending' and user == doc.uploaded_by or revision.status == 'pending' and user == contract.owner %}
+                                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#uploadRevisedModal" data-revision-id="{{ revision.id }}">
+                                        <i class="bi bi-upload"></i> Upload Revised
+                                    </button>
+                                    {% elif revision.status == 'revised' and can_update_status %}
+                                    <div class="btn-group btn-group-sm w-100" role="group">
+                                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveRevisedModal" data-revision-id="{{ revision.id }}">
+                                            <i class="bi bi-check"></i> Approve
+                                        </button>
+                                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectRevisedModal" data-revision-id="{{ revision.id }}">
+                                            <i class="bi bi-x"></i> Reject
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted small text-center">No business entity documents uploaded</p>
                     {% endif %}
                 </div>
             </div>
             
-            <!-- Documents -->
-            <div class="card mb-3">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-file-earmark"></i> Documents</h5>
-                    {% has_contract_permission user contract 'add_document' as can_add_document %}
-                    {% if can_add_document %}
-                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addDocumentModal">
-                        <i class="bi bi-plus"></i> Add
-                    </button>
-                    {% endif %}
-                </div>
-                <div class="card-body">
-                    {% if contract.document %}
-                    <div class="mb-2">
-                        <strong>Main Contract:</strong><br>
-                        <a href="{{ contract.document.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                            <i class="bi bi-download"></i> Download
-                        </a>
+            <!-- Request Revision Modal -->
+            <div class="modal fade" id="requestRevisionModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Request Document Revision</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="requestRevisionForm" method="post" action="">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="revisedDocumentType" class="form-label">Document Type</label>
+                                    <input type="text" id="revisedDocumentType" class="form-control" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="revisionReason" class="form-label">Reason for Revision <span class="text-danger">*</span></label>
+                                    <textarea class="form-control" id="revisionReason" name="reason" rows="4" required placeholder="Describe what needs to be corrected or improved..."></textarea>
+                                    <small class="form-text text-muted">Be specific about what corrections are needed</small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-warning">Send Revision Request</button>
+                            </div>
+                        </form>
                     </div>
-                    <hr>
-                    {% endif %}
-                    
-                    {% if documents %}
-                    {% for doc in documents %}
-                    <div class="mb-2">
-                        <strong>{{ doc.title }}</strong><br>
-                        <small class="text-muted">{{ doc.uploaded_at|date:"M d, Y" }}</small><br>
-                        <a href="{{ doc.document.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                            <i class="bi bi-download"></i> Download
-                        </a>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <p class="text-muted small text-center">No additional documents</p>
-                    {% endif %}
                 </div>
             </div>
+            
+            <!-- Upload Revised Document Modal -->
+            <div class="modal fade" id="uploadRevisedModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Upload Revised Document</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="uploadRevisedForm" method="post" enctype="multipart/form-data" action="">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <div class="alert alert-info">
+                                    <strong>Note:</strong> The legal reviewer has requested changes to this document. Please upload the corrected version.
+                                </div>
+                                <div class="mb-3">
+                                    <label for="revisedDocumentFile" class="form-label">Select Corrected Document <span class="text-danger">*</span></label>
+                                    <input type="file" class="form-control" id="revisedDocumentFile" name="revised_document" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                                    <small class="form-text text-muted">Formats: PDF, DOC, DOCX, JPG, JPEG, PNG</small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success">Upload Revised Document</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Approve Revised Document Modal -->
+            <div class="modal fade" id="approveRevisedModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Approve Revised Document</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="approveRevisedForm" method="post" action="">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <div class="alert alert-success">
+                                    <strong>Document Review:</strong> The revised document looks good and meets the requirements.
+                                </div>
+                                <div class="mb-3">
+                                    <label for="approvalNotes" class="form-label">Approval Notes (Optional)</label>
+                                    <textarea class="form-control" id="approvalNotes" name="approval_notes" rows="3" placeholder="Add any comments for the uploader..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success">Approve Document</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Reject Revised Document Modal -->
+            <div class="modal fade" id="rejectRevisedModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Reject Revised Document</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="rejectRevisedForm" method="post" action="">
+                            {% csrf_token %}
+                            <div class="modal-body">
+                                <div class="alert alert-danger">
+                                    <strong>Document Rejection:</strong> The revised document still needs further corrections.
+                                </div>
+                                <div class="mb-3">
+                                    <label for="rejectionReason" class="form-label">Reason for Rejection <span class="text-danger">*</span></label>
+                                    <textarea class="form-control" id="rejectionReason" name="rejection_reason" rows="3" required placeholder="Specify what still needs to be corrected..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger">Reject & Request Revision</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             
             <!-- Final Approved Document -->
             <div class="card mb-3">
@@ -427,6 +598,9 @@
                     {% endif %}
                     {% else %}
                     <p class="text-muted small">No final approved document uploaded yet.</p>
+                    {% if contract.status != 'APPROVED' and contract.status != 'ACTIVE' %}
+                    <small class="text-warning">Upload is available after Legal Approval (Approved status).</small>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -577,4 +751,51 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Request Revision Modal
+    const requestRevisionModal = document.getElementById('requestRevisionModal');
+    if (requestRevisionModal) {
+        requestRevisionModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const documentId = button.getAttribute('data-document-id');
+            const documentType = button.getAttribute('data-document-type');
+            
+            document.getElementById('revisedDocumentType').value = documentType;
+            document.getElementById('requestRevisionForm').action = `/contracts/{{ contract.pk }}/document/${documentId}/request-revision/`;
+        });
+    }
+    
+    // Upload Revised Document Modal
+    const uploadRevisedModal = document.getElementById('uploadRevisedModal');
+    if (uploadRevisedModal) {
+        uploadRevisedModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const revisionId = button.getAttribute('data-revision-id');
+            document.getElementById('uploadRevisedForm').action = `/contracts/{{ contract.pk }}/revision/${revisionId}/upload-revised/`;
+        });
+    }
+    
+    // Approve Revised Document Modal
+    const approveRevisedModal = document.getElementById('approveRevisedModal');
+    if (approveRevisedModal) {
+        approveRevisedModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const revisionId = button.getAttribute('data-revision-id');
+            document.getElementById('approveRevisedForm').action = `/contracts/{{ contract.pk }}/revision/${revisionId}/approve/`;
+        });
+    }
+    
+    // Reject Revised Document Modal
+    const rejectRevisedModal = document.getElementById('rejectRevisedModal');
+    if (rejectRevisedModal) {
+        rejectRevisedModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const revisionId = button.getAttribute('data-revision-id');
+            document.getElementById('rejectRevisedForm').action = `/contracts/{{ contract.pk }}/revision/${revisionId}/reject/`;
+        });
+    }
+});
+</script>
 {% endblock %}

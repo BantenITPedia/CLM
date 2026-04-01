@@ -105,3 +105,6 @@ def comment_added(sender, instance, created, **kwargs):
             user=instance.user,
             details=f"Comment added by {instance.user.get_full_name() or instance.user.username if instance.user else 'Unknown'}"
         )
+
+        # Notify active participants about the new comment
+        EmailService.send_comment_added_email(instance.contract, instance)

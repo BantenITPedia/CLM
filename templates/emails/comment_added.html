@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>New Comment Notification</title>
+</head>
+<body>
+    <p>Hi Team,</p>
+
+    <p>A new comment was added to this contract:</p>
+
+    <ul>
+        <li><strong>Contract:</strong> {{ contract.title }}</li>
+        <li><strong>Comment by:</strong> {{ commenter_name }}</li>
+    </ul>
+
+    <p><strong>Comment:</strong></p>
+    <blockquote>{{ comment.text }}</blockquote>
+
+    <p>
+        Open contract:
+        <a href="{{ site_url }}/contracts/{{ contract.id }}/">{{ site_url }}/contracts/{{ contract.id }}/</a>
+    </p>
+
+    <p>Best regards,<br>Legal CLM System</p>
+</body>
+</html>

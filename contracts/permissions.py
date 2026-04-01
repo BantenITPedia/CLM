@@ -1,4 +1,4 @@
-from .models import ParticipantRole, ContractPermission, ContractRolePermission
+from .models import ParticipantRole, ContractPermission, ContractRolePermission, ContractStatus
 
 
 PERMISSION_ROLE_MAP = {
@@ -20,7 +20,6 @@ PERMISSION_ROLE_MAP = {
     ContractPermission.UPDATE_STATUS: {
         ParticipantRole.OWNER,
         ParticipantRole.LEGAL,
-        ParticipantRole.APPROVER,
     },
     ContractPermission.MANAGE_PARTICIPANTS: {
         ParticipantRole.OWNER,
@@ -63,6 +62,30 @@ PERMISSION_LABELS = {
     ContractPermission.ADD_COMMENT: 'Add comments',
     ContractPermission.EDIT_STRUCTURED_DATA: 'Edit structured data',
     ContractPermission.REGENERATE_DRAFT: 'Regenerate drafts',
+}
+
+
+WORKFLOW_TRANSITION_MAP = {
+    ContractStatus.DRAFT: {
+        ParticipantRole.OWNER: {ContractStatus.SUBMITTED},
+        ParticipantRole.SALES: {ContractStatus.SUBMITTED},
+    },
+    ContractStatus.SUBMITTED: {
+        ParticipantRole.LEGAL: {ContractStatus.LEGAL_REVIEW, ContractStatus.DRAFT},
+    },
+    ContractStatus.LEGAL_REVIEW: {
+        ParticipantRole.LEGAL: {ContractStatus.APPROVED, ContractStatus.DRAFT},
+    },
+    ContractStatus.APPROVED: {
+        ParticipantRole.LEGAL: {ContractStatus.ACTIVE, ContractStatus.TERMINATED},
+    },
+    ContractStatus.ACTIVE: {
+        ParticipantRole.LEGAL: {ContractStatus.EXPIRING_SOON, ContractStatus.TERMINATED},
+    },
+    ContractStatus.EXPIRING_SOON: {
+        ParticipantRole.LEGAL: {ContractStatus.ACTIVE, ContractStatus.TERMINATED},
+    },
+    ContractStatus.TERMINATED: {},
 }
 
 
@@ -135,11 +158,17 @@ def can_edit_contract(user, contract):
 
 
 def can_delete_contract(user, contract):
+    if not user or not user.is_authenticated or not contract:
+        return False
+
+    if contract.status not in {ContractStatus.DRAFT, ContractStatus.SUBMITTED}:
+        return False
+
     return has_contract_permission(user, contract, ContractPermission.DELETE_CONTRACT)
 
 
 def can_update_contract_status(user, contract):
-    return has_contract_permission(user, contract, ContractPermission.UPDATE_STATUS)
+    return bool(get_allowed_next_statuses(user, contract))
 
 
 def can_manage_participants(user, contract):
@@ -160,3 +189,30 @@ def can_edit_contract_data(user, contract):
 
 def can_regenerate_draft(user, contract):
     return has_contract_permission(user, contract, ContractPermission.REGENERATE_DRAFT)
+
+
+def get_allowed_next_statuses(user, contract):
+    if not user or not user.is_authenticated or not contract:
+        return set()
+
+    if user.is_superuser:
+        return {choice[0] for choice in ContractStatus.choices if choice[0] != contract.status}
+
+    if not has_contract_permission(user, contract, ContractPermission.UPDATE_STATUS):
+        return set()
+
+    current_status = contract.status
+    transitions_by_role = WORKFLOW_TRANSITION_MAP.get(current_status, {})
+    roles = get_user_roles(contract, user)
+
+    allowed_statuses = set()
+    for role in roles:
+        allowed_statuses.update(transitions_by_role.get(role, set()))
+
+    return allowed_statuses
+
+
+def can_transition_to_status(user, contract, next_status):
+    if not next_status:
+        return False
+    return next_status in get_allowed_next_statuses(user, contract)

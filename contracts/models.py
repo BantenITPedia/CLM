@@ -6,6 +6,7 @@ from datetime import timedelta
 
 class ContractType(models.TextChoices):
     GENERAL_TRADE = 'GENERAL_TRADE', 'General Trade Agreement'
+    GENERAL_TRADE_PREMIUM = 'GENERAL_TRADE_PREMIUM', 'General Trade Agreement - Premium'
     MODERN_TRADE = 'MODERN_TRADE', 'Modern Trade Agreement'
     DISTRIBUTOR = 'DISTRIBUTOR', 'Distributor Agreement'
     NDA = 'NDA', 'Non-Disclosure Agreement'
@@ -36,6 +37,23 @@ class ParticipantRole(models.TextChoices):
     APPROVER = 'APPROVER', 'Approver'
 
 
+class BusinessEntityType(models.TextChoices):
+    PT = 'PT', 'Perusahaan Terbatas (PT)'
+    CV = 'CV', 'Commanditaire Vennootschap (CV)'
+    PERORANGAN = 'PERORANGAN', 'Perorangan'
+
+
+class BusinessDocumentType(models.TextChoices):
+    # For PT and CV
+    AKTA_PENDIRIAN = 'AKTA_PENDIRIAN', 'Akta Pendirian'
+    NPWP = 'NPWP', 'NPWP'
+    NIB = 'NIB', 'NIB (Nomor Induk Berusaha)'
+    KTP_PENANGGUNG_JAWAB = 'KTP_PENANGGUNG_JAWAB', 'KTP Penanggung Jawab'
+    PERIZINAN_LAINNYA = 'PERIZINAN_LAINNYA', 'Perizinan Lainnya'
+    # For Perorangan (only KTP for individual, NPWP covered above)
+    KTP = 'KTP', 'KTP'
+
+
 class ContractPermission(models.TextChoices):
     VIEW_CONTRACT = 'view_contract', 'View contract'
     EDIT_CONTRACT = 'edit_contract', 'Edit contract'
@@ -53,7 +71,7 @@ class ContractTypeDefinition(models.Model):
     """Configurable contract type registry for dynamic fields and templates"""
 
     code = models.CharField(
-        max_length=20,
+        max_length=25,
         choices=ContractType.choices,
         unique=True,
         help_text="Internal contract type code (matches Contract.contract_type)"
@@ -77,7 +95,7 @@ class Contract(models.Model):
     # Basic Information
     title = models.CharField(max_length=255)
     contract_type = models.CharField(
-        max_length=20,
+        max_length=25,
         choices=ContractType.choices,
         default=ContractType.OTHER
     )
@@ -86,6 +104,15 @@ class Contract(models.Model):
     # Parties
     party_a = models.CharField(max_length=255, help_text="First party (usually our company)")
     party_b = models.CharField(max_length=255, help_text="Second party (customer/vendor)")
+    
+    # Business Entity Information
+    business_entity_type = models.CharField(
+        max_length=20,
+        choices=BusinessEntityType.choices,
+        null=True,
+        blank=True,
+        verbose_name="Business Entity Type"
+    )
     
     # Contract Details
     contract_value = models.DecimalField(
@@ -101,6 +128,12 @@ class Contract(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
+    duration_days = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Duration (days)",
+        help_text="Contract duration in days (alternative to end date)"
+    )
     
     # Expiry & Renewal
     renewal_reminder_days = models.IntegerField(
@@ -170,6 +203,17 @@ class Contract(models.Model):
     
     def __str__(self):
         return f"{self.title} - {self.get_status_display()}"
+    
+    def save(self, *args, **kwargs):
+        """Auto-calculate end_date from start_date + duration_days if provided"""
+        if self.start_date and self.duration_days and not self.end_date:
+            # Calculate end_date from start_date + duration_days
+            self.end_date = self.start_date + timedelta(days=self.duration_days)
+        elif self.start_date and self.end_date and not self.duration_days:
+            # Calculate duration_days from start_date and end_date
+            delta = self.end_date - self.start_date
+            self.duration_days = delta.days
+        super().save(*args, **kwargs)
     
     @property
     def days_until_expiry(self):
@@ -883,3 +927,350 @@ class ReminderLog(models.Model):
     
     def __str__(self):
         return f"{self.get_reminder_type_display()} for {self.contract.title} ({self.status})"
+
+
+class NotificationEmailTemplate(models.Model):
+    """Admin-managed configuration for outbound notification emails."""
+
+    event_key = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Email event key (for example: contract_created, legal_review, expiry_reminder)"
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    enabled = models.BooleanField(
+        default=True,
+        help_text="Disable to skip this notification type"
+    )
+    subject_template = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Optional Django-template subject override"
+    )
+    use_custom_html = models.BooleanField(
+        default=False,
+        help_text="Use custom HTML body below instead of templates/emails/*.html"
+    )
+    html_template = models.TextField(
+        blank=True,
+        help_text="Custom HTML body using Django template syntax"
+    )
+    text_template = models.TextField(
+        blank=True,
+        help_text="Optional plain-text body using Django template syntax"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['event_key']
+
+    def __str__(self):
+        return f"{self.event_key} - {'Enabled' if self.enabled else 'Disabled'}"
+
+
+class EmailSettings(models.Model):
+    """Active outbound email provider configuration."""
+
+    PROVIDER_SMTP = 'SMTP'
+    PROVIDER_RESEND = 'RESEND'
+    PROVIDER_SENDGRID = 'SENDGRID'
+
+    PROVIDER_CHOICES = [
+        (PROVIDER_SMTP, 'SMTP'),
+        (PROVIDER_RESEND, 'Resend API'),
+        (PROVIDER_SENDGRID, 'SendGrid API'),
+    ]
+
+    name = models.CharField(max_length=100, default='Default Email Settings')
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default=PROVIDER_SMTP)
+    is_active = models.BooleanField(default=True)
+
+    default_from_email = models.EmailField(blank=True)
+
+    # SMTP fields
+    host = models.CharField(max_length=255, blank=True)
+    port = models.IntegerField(default=587)
+    username = models.CharField(max_length=255, blank=True)
+    password = models.CharField(max_length=255, blank=True)
+    use_tls = models.BooleanField(default=True)
+    use_ssl = models.BooleanField(default=False)
+
+    # API fields
+    api_key = models.CharField(max_length=255, blank=True)
+    api_endpoint = models.URLField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_active', '-updated_at']
+
+    def __str__(self):
+        status = 'Active' if self.is_active else 'Inactive'
+        return f"{self.name} ({self.provider}) - {status}"
+
+    def save(self, *args, **kwargs):
+        if self.is_active:
+            EmailSettings.objects.exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+
+
+class BusinessEntityDocument(models.Model):
+    """
+    Documents required for business entity verification before contract creation
+    Supports different document types for PT, CV, and Perorangan
+    """
+    contract = models.ForeignKey(
+        Contract,
+        on_delete=models.CASCADE,
+        related_name='business_entity_documents',
+        help_text="Contract this document belongs to"
+    )
+    
+    document_type = models.CharField(
+        max_length=50,
+        choices=BusinessDocumentType.choices,
+        verbose_name="Document Type"
+    )
+    
+    document = models.FileField(
+        upload_to='business_entity_documents/%Y/%m/',
+        help_text="Upload the required document"
+    )
+    
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="User who uploaded this document"
+    )
+    
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    notes = models.TextField(
+        blank=True,
+        help_text="Additional notes or description"
+    )
+    
+    class Meta:
+        ordering = ['document_type', 'uploaded_at']
+        unique_together = ['contract', 'document_type']
+    
+    def __str__(self):
+        return f"{self.get_document_type_display()} - {self.contract.title}"
+
+
+class DocumentRevisionRequest(models.Model):
+    """
+    Track document revision requests from legal reviewers
+    Allows legal to request corrections on business entity documents
+    """
+    
+    class RevisionStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending Revision'
+        REVISED = 'revised', 'Revised - Awaiting Approval'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+    
+    document = models.ForeignKey(
+        BusinessEntityDocument,
+        on_delete=models.CASCADE,
+        related_name='revision_requests'
+    )
+    
+    requested_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='document_revision_requests',
+        help_text="Legal reviewer who requested the revision"
+    )
+    
+    reason = models.TextField(
+        help_text="Reason why the document needs revision",
+        verbose_name="Revision Reason"
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=RevisionStatus.choices,
+        default=RevisionStatus.PENDING
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Track if document was revised
+    revised_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the document was re-uploaded"
+    )
+    
+    revised_document = models.FileField(
+        upload_to='business_entity_documents/%Y/%m/',
+        null=True,
+        blank=True,
+        help_text="The revised/replaced document"
+    )
+    
+    revised_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='document_revisions',
+        help_text="User who uploaded the revised document"
+    )
+    
+    approval_notes = models.TextField(
+        blank=True,
+        help_text="Notes from legal reviewer on approval/rejection"
+    )
+    
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+    
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='document_approvals'
+    )
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Revision Request for {self.document.get_document_type_display()} ({self.get_status_display()})"
+    
+    @property
+    def days_pending(self):
+        """Calculate days since revision was requested"""
+        from django.utils import timezone
+        return (timezone.now() - self.created_at).days
+
+
+class CompanyProfile(models.Model):
+    """
+    Company/Organization information (Party A)
+    Stores the main company details used as default Party A in contracts
+    Singleton pattern: only one active profile at a time
+    """
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Company Name",
+        help_text="Full legal name (e.g., PT. PERFECT COMPANION INDONESIA)"
+    )
+    
+    short_name = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Short Name",
+        help_text="Abbreviated name for display"
+    )
+    
+    business_entity_type = models.CharField(
+        max_length=20,
+        choices=BusinessEntityType.choices,
+        verbose_name="Entity Type"
+    )
+    
+    # Legal Documents
+    npwp = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="NPWP",
+        help_text="Nomor Pokok Wajib Pajak"
+    )
+    
+    nib = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="NIB",
+        help_text="Nomor Induk Berusaha"
+    )
+    
+    akta_pendirian_number = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Akta Pendirian Number",
+        help_text="Certificate of Incorporation number"
+    )
+    
+    # Contact Information
+    address = models.TextField(
+        blank=True,
+        verbose_name="Company Address"
+    )
+    
+    phone = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Phone Number"
+    )
+    
+    email = models.EmailField(
+        blank=True,
+        verbose_name="Company Email"
+    )
+    
+    website = models.URLField(
+        blank=True,
+        verbose_name="Website"
+    )
+    
+    # Legal Representative
+    legal_representative_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Legal Representative",
+        help_text="Name of person authorized to sign contracts"
+    )
+    
+    legal_representative_title = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Representative Title",
+        help_text="e.g., Direktur Utama, CEO"
+    )
+    
+    # Control fields
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Active Profile",
+        help_text="Only one profile can be active at a time"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='company_profile_updates'
+    )
+    
+    class Meta:
+        verbose_name = "Company Profile"
+        verbose_name_plural = "Company Profiles"
+        ordering = ['-is_active', '-updated_at']
+    
+    def __str__(self):
+        return f"{self.name} ({'Active' if self.is_active else 'Inactive'})"
+    
+    def save(self, *args, **kwargs):
+        """Ensure only one active profile exists"""
+        if self.is_active:
+            # Deactivate all other profiles
+            CompanyProfile.objects.exclude(pk=self.pk).update(is_active=False)
+        super().save(*args, **kwargs)
+    
+    @classmethod
+    def get_active(cls):
+        """Get the currently active company profile"""
+        return cls.objects.filter(is_active=True).first()

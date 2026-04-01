@@ -39,6 +39,8 @@ services:
   nginx:
     depends_on:
     - web
+    ports:
+    - 80:80
     expose:
     - 8000
     - 8001
@@ -59,7 +61,9 @@ services:
     image: redis:7-alpine
   web:
     build: .
-    command: gunicorn legal_clm.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    command: gunicorn legal_clm.wsgi:application --bind 0.0.0.0:8000 --workers 1 --timeout 120
+    ports:
+    - 8000:8000
     depends_on:
       db:
         condition: service_healthy
@@ -71,7 +75,6 @@ services:
     - .:/app
     - static_volume:/app/staticfiles
     - media_volume:/app/media
-version: '3.8'
 volumes:
   media_volume: null
   postgres_data: null
