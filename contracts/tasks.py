@@ -6,6 +6,40 @@ from .services import EmailService, ReminderService
 
 
 @shared_task
+def auto_terminate_expired_contracts():
+    """
+    Daily task: automatically terminate ACTIVE and EXPIRING_SOON contracts
+    whose end_date has passed.
+    """
+    today = timezone.now().date()
+    terminated_count = 0
+
+    expired = Contract.objects.filter(
+        status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON],
+        end_date__lt=today,
+    )
+
+    for contract in expired:
+        prev_status = contract.status
+        contract.status = ContractStatus.TERMINATED
+        contract.save(update_fields=['status'])
+
+        AuditLog.objects.create(
+            contract=contract,
+            action='STATUS_CHANGE',
+            old_value=prev_status,
+            new_value=ContractStatus.TERMINATED,
+            details=f'Contract automatically terminated — end date {contract.end_date} has passed',
+        )
+        terminated_count += 1
+
+    return {
+        'auto_terminated': terminated_count,
+        'checked_at': str(today),
+    }
+
+
+@shared_task
 def update_expiring_contracts():
     """
     Daily task to mark ACTIVE contracts as EXPIRING_SOON if within 90 days of expiration
@@ -120,7 +154,7 @@ def create_renewal_contract(contract_id):
             parent_contract=parent_contract,
             status__in=[
                 ContractStatus.DRAFT,
-                ContractStatus.PENDING_REVIEW,
+                ContractStatus.SUBMITTED,
                 ContractStatus.LEGAL_REVIEW
             ]
         ).exists()
@@ -196,6 +230,18 @@ def test_email_task():
     """Test task to verify Celery is working"""
     print("Celery is working! Task executed successfully.")
     return "Test task completed"
+
+
+@shared_task
+def send_user_crud_notification_task(action, target_payload, actor_name='System', actor_email='', changed_fields=None):
+    """Deliver user CRUD notification outside the admin request lifecycle."""
+    return EmailService.send_user_crud_notification_from_data(
+        action=action,
+        target_payload=target_payload,
+        actor_name=actor_name,
+        actor_email=actor_email,
+        changed_fields=changed_fields or [],
+    )
 
 @shared_task
 def schedule_reminders():

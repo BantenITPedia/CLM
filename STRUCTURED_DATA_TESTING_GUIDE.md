@@ -45,7 +45,7 @@ Employment Contract needs:
 
 **Steps:**
 
-1. Open http://localhost/admin/ (login: admin/admin123)
+1. Open http://localhost/admin/ and login with your configured superuser account
 
 2. Click **"Contract type definitions"** → Click **"VENDOR"** (Vendor Agreement)
 

@@ -1,0 +1,1204 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-20 02:07+0000\n"
+"PO-Revision-Date: 2026-05-19 03:35+0000\\nLast-Translator: CLM Team "
+"<devnull@example.com>\\nLanguage-Team: Indonesian\\nLanguage: id\\nMIME-"
+"Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: templates/base.html:115 templates/base.html:169
+msgid "Language"
+msgstr "Bahasa"
+
+#: templates/base.html:135 templates/base.html:164
+#: templates/contracts/dashboard.html:4 templates/contracts/dashboard.html:5
+msgid "Dashboard"
+msgstr "Dasbor"
+
+#: templates/base.html:138 templates/contracts/contract_list.html:6
+#: templates/contracts/contract_list.html:12
+#: templates/contracts/terminated_contracts.html:14
+msgid "All Contracts"
+msgstr "Semua Kontrak"
+
+#: templates/base.html:141 templates/contracts/dashboard.html:175
+#: templates/contracts/wizard_step1_entity_type.html:4
+#: templates/contracts/wizard_step1_entity_type.html:5
+#: templates/contracts/wizard_step2_documents.html:4
+#: templates/contracts/wizard_step2_documents.html:5
+#: templates/contracts/wizard_step3_contract_info.html:4
+#: templates/contracts/wizard_step3_contract_info.html:5
+#: templates/contracts/wizard_step4_structured_data.html:4
+#: templates/contracts/wizard_step4_structured_data.html:5
+msgid "Create Contract"
+msgstr "Buat Kontrak"
+
+#: templates/base.html:144 templates/contracts/dashboard.html:31
+#: templates/contracts/dashboard.html:71 templates/contracts/dashboard.html:187
+msgid "Expiring Soon"
+msgstr "Segera Berakhir"
+
+#: templates/base.html:147 templates/contracts/dashboard.html:193
+msgid "Terminated"
+msgstr "Dihentikan"
+
+#: templates/base.html:152
+msgid "Admin Panel"
+msgstr "Panel Admin"
+
+#: templates/base.html:156
+msgid "Logout"
+msgstr "Keluar"
+
+#: templates/contracts/contract_confirm_delete.html:4
+#: templates/contracts/contract_confirm_delete.html:5
+#: templates/contracts/contract_confirm_delete.html:35
+#: templates/contracts/contract_detail.html:830
+msgid "Delete Contract"
+msgstr "Hapus Kontrak"
+
+#: templates/contracts/contract_confirm_delete.html:13
+#: templates/contracts/contract_detail.html:815
+msgid "Confirm Deletion"
+msgstr "Konfirmasi Penghapusan"
+
+#: templates/contracts/contract_confirm_delete.html:16
+#: templates/contracts/contract_detail.html:819
+msgid "Are you sure you want to delete this contract?"
+msgstr "Apakah Anda yakin ingin menghapus kontrak ini?"
+
+#: templates/contracts/contract_confirm_delete.html:18
+#: templates/contracts/contract_detail.html:756
+#: templates/contracts/contract_list.html:59
+#: templates/contracts/expired_contracts.html:25
+#: templates/contracts/expiring_contracts.html:28
+#: templates/contracts/terminated_contracts.html:31
+msgid "Title"
+msgstr "Judul"
+
+#: templates/contracts/contract_confirm_delete.html:19
+#: templates/contracts/contract_detail.html:18
+#: templates/contracts/contract_list.html:60
+#: templates/contracts/expired_contracts.html:26
+#: templates/contracts/expiring_contracts.html:29
+#: templates/contracts/terminated_contracts.html:32
+msgid "Type"
+msgstr "Jenis"
+
+#: templates/contracts/contract_confirm_delete.html:20
+#: templates/contracts/contract_detail.html:73
+#: templates/contracts/contract_list.html:61
+#: templates/contracts/expired_contracts.html:27
+#: templates/contracts/expiring_contracts.html:30
+#: templates/contracts/terminated_contracts.html:33
+msgid "Party B"
+msgstr "Pihak Kedua"
+
+#: templates/contracts/contract_confirm_delete.html:21
+#: templates/contracts/contract_list.html:62
+msgid "Status"
+msgstr "Status"
+
+#: templates/contracts/contract_confirm_delete.html:23
+msgid "Warning"
+msgstr "Peringatan"
+
+#: templates/contracts/contract_confirm_delete.html:23
+msgid ""
+"This action cannot be undone. All related data including participants, "
+"signatures, documents, comments, and audit logs will be permanently deleted."
+msgstr "Aksi ini tidak dapat dibatalkan. Semua data terkait termasuk peserta, tanda tangan, dokumen, komentar, dan log audit akan dihapus permanen."
+
+#: templates/contracts/contract_confirm_delete.html:25
+#: templates/contracts/contract_detail.html:823
+msgid "Policy"
+msgstr "Kebijakan"
+
+#: templates/contracts/contract_confirm_delete.html:25
+#: templates/contracts/contract_detail.html:823
+msgid ""
+"Only superuser can delete contracts beyond Draft (legacy Submitted also "
+"supported)."
+msgstr "Hanya superuser yang dapat menghapus kontrak setelah melewati Draft (Submitted lama juga didukung)."
+
+#: templates/contracts/contract_confirm_delete.html:32
+#: templates/contracts/contract_data_form.html:33
+#: templates/contracts/contract_detail.html:350
+#: templates/contracts/contract_detail.html:428
+#: templates/contracts/contract_detail.html:556
+#: templates/contracts/contract_detail.html:585
+#: templates/contracts/contract_detail.html:613
+#: templates/contracts/contract_detail.html:641
+#: templates/contracts/contract_detail.html:736
+#: templates/contracts/contract_detail.html:769
+#: templates/contracts/contract_detail.html:800
+#: templates/contracts/contract_detail.html:827
+#: templates/contracts/contract_form.html:184
+#: templates/contracts/sign_contract.html:47
+#: templates/contracts/wizard_step1_entity_type.html:58
+#: templates/contracts/wizard_step2_documents.html:61
+#: templates/contracts/wizard_step3_contract_info.html:88
+#: templates/contracts/wizard_step4_structured_data.html:273
+msgid "Cancel"
+msgstr "Batal"
+
+#: templates/contracts/contract_data_form.html:4
+msgid "Contract Data"
+msgstr "Data Kontrak"
+
+#: templates/contracts/contract_data_form.html:5
+msgid "Structured Data Input"
+msgstr "Input Data Terstruktur"
+
+#: templates/contracts/contract_data_form.html:12
+msgid "Back to Contract"
+msgstr "Kembali ke Kontrak"
+
+#: templates/contracts/contract_data_form.html:16
+msgid ""
+"Fill in the details below. When you click <strong>\"Submit Data\"</strong>, "
+"your information will be saved and a contract draft will be automatically "
+"generated."
+msgstr "Isi detail di bawah ini. Saat Anda mengeklik <strong>\"Kirim Data\"</strong>, informasi Anda akan disimpan dan draf kontrak akan dibuat otomatis."
+
+#: templates/contracts/contract_data_form.html:34
+msgid "Save Data"
+msgstr "Simpan Data"
+
+#: templates/contracts/contract_detail.html:7
+msgid "Contract Details"
+msgstr "Detail Kontrak"
+
+#: templates/contracts/contract_detail.html:19
+msgid "ID"
+msgstr "ID"
+
+#: templates/contracts/contract_detail.html:22
+msgid "Contract Number"
+msgstr "Nomor Kontrak"
+
+#: templates/contracts/contract_detail.html:22
+msgid "Not assigned yet"
+msgstr "Belum ditetapkan"
+
+#: templates/contracts/contract_detail.html:25
+#: templates/contracts/contract_list.html:82
+#: templates/contracts/dashboard.html:108
+#: templates/contracts/dashboard.html:150
+msgid "Legal Review"
+msgstr "Tinjauan Legal"
+
+#: templates/contracts/contract_detail.html:34
+#: templates/contracts/contract_list.html:113
+msgid "Edit"
+msgstr "Ubah"
+
+#: templates/contracts/contract_detail.html:39
+msgid "Delete"
+msgstr "Hapus"
+
+#: templates/contracts/contract_detail.html:45
+msgid ""
+"Delete is restricted once contract moves beyond Draft (legacy Submitted also "
+"supported). Only superuser can delete at this stage."
+msgstr "Penghapusan dibatasi setelah kontrak melewati Draft (Submitted lama juga didukung). Hanya superuser yang dapat menghapus pada tahap ini."
+
+#: templates/contracts/contract_detail.html:51
+#: templates/contracts/contract_detail.html:202
+#: templates/contracts/wizard_step4_structured_data.html:31
+msgid "Structured Data"
+msgstr "Data Terstruktur"
+
+#: templates/contracts/contract_detail.html:65
+msgid "Contract Information"
+msgstr "Informasi Kontrak"
+
+#: templates/contracts/contract_detail.html:70
+msgid "Party A"
+msgstr "Pihak Pertama"
+
+#: templates/contracts/contract_detail.html:78
+#: templates/contracts/contract_form.html:119
+#: templates/contracts/contract_list.html:63
+msgid "Start Date"
+msgstr "Tanggal Mulai"
+
+#: templates/contracts/contract_detail.html:81
+#: templates/contracts/contract_form.html:133
+#: templates/contracts/contract_list.html:64
+#: templates/contracts/expired_contracts.html:28
+#: templates/contracts/expiring_contracts.html:31
+#: templates/contracts/terminated_contracts.html:34
+msgid "End Date"
+msgstr "Tanggal Berakhir"
+
+#: templates/contracts/contract_detail.html:86
+msgid "Target Value"
+msgstr "Nilai Target"
+
+#: templates/contracts/contract_detail.html:94
+msgid "Contract Duration"
+msgstr "Durasi Kontrak"
+
+#: templates/contracts/contract_detail.html:97
+#: templates/contracts/contract_list.html:91
+#: templates/contracts/expiring_contracts.html:50
+#, python-format
+msgid "%(days)s days"
+msgstr "%(days)s hari"
+
+#: templates/contracts/contract_detail.html:106
+#: templates/contracts/contract_detail.html:764
+msgid "Description"
+msgstr "Deskripsi"
+
+#: templates/contracts/contract_detail.html:107
+msgid "No description provided"
+msgstr "Tidak ada deskripsi"
+
+#: templates/contracts/contract_detail.html:112
+#: templates/contracts/contract_list.html:66
+msgid "Owner"
+msgstr "Pemilik"
+
+#: templates/contracts/contract_detail.html:115
+msgid "Created"
+msgstr "Dibuat"
+
+#: templates/contracts/contract_detail.html:124
+msgid "Participants"
+msgstr "Peserta"
+
+#: templates/contracts/contract_detail.html:128
+msgid "Add"
+msgstr "Tambah"
+
+#: templates/contracts/contract_detail.html:146
+msgid "No participants added yet"
+msgstr "Belum ada peserta ditambahkan"
+
+#: templates/contracts/contract_detail.html:155
+msgid "Comments"
+msgstr "Komentar"
+
+#: templates/contracts/contract_detail.html:167
+msgid "Internal comment (not visible to customers)"
+msgstr "Komentar internal (tidak terlihat oleh pelanggan)"
+
+#: templates/contracts/contract_detail.html:171
+msgid "Add Comment"
+msgstr "Tambah Komentar"
+
+#: templates/contracts/contract_detail.html:186
+msgid "Internal"
+msgstr "Internal"
+
+#: templates/contracts/contract_detail.html:191
+msgid "No comments yet"
+msgstr "Belum ada komentar"
+
+#: templates/contracts/contract_detail.html:206
+msgid "Edit Data"
+msgstr "Ubah Data"
+
+#: templates/contracts/contract_detail.html:206
+msgid "Add Data"
+msgstr "Tambah Data"
+
+#: templates/contracts/contract_detail.html:220
+#, python-format
+msgid "Updated on %(date)s"
+msgstr "Diperbarui pada %(date)s"
+
+#: templates/contracts/contract_detail.html:227
+#: templates/contracts/contract_detail.html:335
+msgid "Request Data Revision"
+msgstr "Minta Revisi Data"
+
+#: templates/contracts/contract_detail.html:259
+msgid "Attached Documents"
+msgstr "Dokumen Terlampir"
+
+#: templates/contracts/contract_detail.html:294
+msgid "No structured data submitted yet."
+msgstr "Belum ada data terstruktur yang dikirim."
+
+#: templates/contracts/contract_detail.html:297
+msgid "Setup Required"
+msgstr "Pengaturan Diperlukan"
+
+#: templates/contracts/contract_detail.html:297
+msgid ""
+"Configure fields for this contract type in <a href=\"/admin/contracts/"
+"contractfield/\" class=\"alert-link\" target=\"_blank\">Admin → Contract "
+"Fields</a>"
+msgstr "Konfigurasikan bidang untuk jenis kontrak ini di <a href=\"/admin/contracts/contractfield/\" class=\"alert-link\" target=\"_blank\">Admin → Contract Fields</a>"
+
+#: templates/contracts/contract_detail.html:307
+msgid "Drafts"
+msgstr "Draf"
+
+#: templates/contracts/contract_detail.html:310
+msgid "Regenerate"
+msgstr "Buat Ulang"
+
+#: templates/contracts/contract_detail.html:317
+#, python-format
+msgid "Latest Generated Draft (v%(v)s)"
+msgstr "Draf Terbaru (v%(v)s)"
+
+#: templates/contracts/contract_detail.html:321
+msgid "Download"
+msgstr "Unduh"
+
+#: templates/contracts/contract_detail.html:325
+msgid "No drafts generated yet."
+msgstr "Belum ada draf yang dibuat."
+
+#: templates/contracts/contract_detail.html:342
+msgid ""
+"This will return the contract to Draft so the requester can correct the data."
+msgstr "Ini akan mengembalikan kontrak ke status Draft agar peminta dapat memperbaiki datanya."
+
+#: templates/contracts/contract_detail.html:345
+#: templates/contracts/contract_detail.html:479
+msgid "Reason"
+msgstr "Alasan"
+
+#: templates/contracts/contract_detail.html:346
+msgid "Explain what data must be corrected..."
+msgstr "Jelaskan data apa yang harus diperbaiki..."
+
+#: templates/contracts/contract_detail.html:351
+#: templates/contracts/contract_detail.html:557
+msgid "Send Revision Request"
+msgstr "Kirim Permintaan Revisi"
+
+#: templates/contracts/contract_detail.html:361
+msgid "Review Decision"
+msgstr "Keputusan Tinjauan"
+
+#: templates/contracts/contract_detail.html:366
+msgid "All documents and data verified? Choose a final decision."
+msgstr "Semua dokumen dan data terverifikasi? Pilih keputusan akhir."
+
+#: templates/contracts/contract_detail.html:378
+msgid "Leave empty for automatic numbering."
+msgstr "Biarkan kosong untuk penomoran otomatis."
+
+#: templates/contracts/contract_detail.html:383
+msgid "Approve Contract"
+msgstr "Setujui Kontrak"
+
+#: templates/contracts/contract_detail.html:389
+#: templates/contracts/contract_detail.html:412
+msgid "Reject Contract"
+msgstr "Tolak Kontrak"
+
+#: templates/contracts/contract_detail.html:398
+msgid "Update Status"
+msgstr "Perbarui Status"
+
+#: templates/contracts/contract_detail.html:402
+msgid "No status transition available for your role at this stage."
+msgstr "Tidak ada transisi status yang tersedia untuk peran Anda pada tahap ini."
+
+#: templates/contracts/contract_detail.html:420
+msgid "Permanent Rejection"
+msgstr "Penolakan Permanen"
+
+#: templates/contracts/contract_detail.html:420
+msgid "This contract will be terminated. This action cannot be undone."
+msgstr "Kontrak ini akan dihentikan. Tindakan ini tidak dapat dibatalkan."
+
+#: templates/contracts/contract_detail.html:423
+#: templates/contracts/contract_detail.html:636
+msgid "Reason for Rejection"
+msgstr "Alasan Penolakan"
+
+#: templates/contracts/contract_detail.html:424
+msgid "Explain why this contract is being rejected..."
+msgstr "Jelaskan mengapa kontrak ini ditolak..."
+
+#: templates/contracts/contract_detail.html:429
+msgid "Confirm Rejection"
+msgstr "Konfirmasi Penolakan"
+
+#: templates/contracts/contract_detail.html:439
+#: templates/contracts/contract_detail.html:452
+msgid "Assign Contract Number"
+msgstr "Tetapkan Nomor Kontrak"
+
+#: templates/contracts/contract_detail.html:449
+msgid ""
+"Fill manually if needed, or leave empty and click assign to auto-generate."
+msgstr "Isi secara manual jika perlu, atau biarkan kosong lalu klik tetapkan untuk membuat otomatis."
+
+#: templates/contracts/contract_detail.html:462
+msgid "Business Entity Documents"
+msgstr "Dokumen Entitas Bisnis"
+
+#: templates/contracts/contract_detail.html:466
+msgid "Documents submitted for business verification:"
+msgstr "Dokumen yang dikirim untuk verifikasi bisnis:"
+
+#: templates/contracts/contract_detail.html:478
+msgid "Revision Requested"
+msgstr "Revisi Diminta"
+
+#: templates/contracts/contract_detail.html:484
+msgid "Awaiting Approval"
+msgstr "Menunggu Persetujuan"
+
+#: templates/contracts/contract_detail.html:485
+msgid "Revised document uploaded, waiting for legal review"
+msgstr "Dokumen revisi diunggah, menunggu tinjauan legal"
+
+#: templates/contracts/contract_detail.html:494
+#: templates/contracts/contract_list.html:108
+#: templates/contracts/expired_contracts.html:51
+#: templates/contracts/expiring_contracts.html:62
+#: templates/contracts/terminated_contracts.html:59
+msgid "View"
+msgstr "Lihat"
+
+#: templates/contracts/contract_detail.html:502
+msgid "Request Revision"
+msgstr "Minta Revisi"
+
+#: templates/contracts/contract_detail.html:511
+msgid "Upload Revised"
+msgstr "Unggah Revisi"
+
+#: templates/contracts/contract_detail.html:516
+msgid "Approve"
+msgstr "Setujui"
+
+#: templates/contracts/contract_detail.html:519
+msgid "Reject"
+msgstr "Tolak"
+
+#: templates/contracts/contract_detail.html:529
+msgid "No business entity documents uploaded"
+msgstr "Tidak ada dokumen entitas bisnis yang diunggah"
+
+#: templates/contracts/contract_detail.html:539
+msgid "Request Document Revision"
+msgstr "Minta Revisi Dokumen"
+
+#: templates/contracts/contract_detail.html:546
+msgid "Document Type"
+msgstr "Jenis Dokumen"
+
+#: templates/contracts/contract_detail.html:550
+msgid "Reason for Revision"
+msgstr "Alasan Revisi"
+
+#: templates/contracts/contract_detail.html:551
+msgid "Describe what needs to be corrected or improved..."
+msgstr "Jelaskan apa yang perlu diperbaiki atau ditingkatkan..."
+
+#: templates/contracts/contract_detail.html:552
+msgid "Be specific about what corrections are needed"
+msgstr "Jelaskan secara spesifik koreksi yang diperlukan"
+
+#: templates/contracts/contract_detail.html:569
+#: templates/contracts/contract_detail.html:586
+msgid "Upload Revised Document"
+msgstr "Unggah Dokumen Revisi"
+
+#: templates/contracts/contract_detail.html:576
+msgid "Note"
+msgstr "Catatan"
+
+#: templates/contracts/contract_detail.html:576
+msgid ""
+"The legal reviewer has requested changes to this document. Please upload the "
+"corrected version."
+msgstr "Peninjau legal telah meminta perubahan pada dokumen ini. Silakan unggah versi yang sudah diperbaiki."
+
+#: templates/contracts/contract_detail.html:579
+msgid "Select Corrected Document"
+msgstr "Pilih Dokumen yang Dikoreksi"
+
+#: templates/contracts/contract_detail.html:581
+msgid "Formats: PDF, DOC, DOCX, JPG, JPEG, PNG"
+msgstr "Format: PDF, DOC, DOCX, JPG, JPEG, PNG"
+
+#: templates/contracts/contract_detail.html:598
+msgid "Approve Revised Document"
+msgstr "Setujui Dokumen Revisi"
+
+#: templates/contracts/contract_detail.html:605
+msgid "Document Review"
+msgstr "Tinjauan Dokumen"
+
+#: templates/contracts/contract_detail.html:605
+msgid "The revised document looks good and meets the requirements."
+msgstr "Dokumen revisi terlihat baik dan memenuhi persyaratan."
+
+#: templates/contracts/contract_detail.html:608
+msgid "Approval Notes (Optional)"
+msgstr "Catatan Persetujuan (Opsional)"
+
+#: templates/contracts/contract_detail.html:609
+msgid "Add any comments for the uploader..."
+msgstr "Tambahkan komentar untuk pengunggah..."
+
+#: templates/contracts/contract_detail.html:614
+msgid "Approve Document"
+msgstr "Setujui Dokumen"
+
+#: templates/contracts/contract_detail.html:626
+msgid "Reject Revised Document"
+msgstr "Tolak Dokumen Revisi"
+
+#: templates/contracts/contract_detail.html:633
+msgid "Document Rejection"
+msgstr "Penolakan Dokumen"
+
+#: templates/contracts/contract_detail.html:633
+msgid "The revised document still needs further corrections."
+msgstr "Dokumen revisi masih memerlukan koreksi lebih lanjut."
+
+#: templates/contracts/contract_detail.html:637
+msgid "Specify what still needs to be corrected..."
+msgstr "Tentukan apa yang masih perlu diperbaiki..."
+
+#: templates/contracts/contract_detail.html:642
+msgid "Reject & Request Revision"
+msgstr "Tolak & Minta Revisi"
+
+#: templates/contracts/contract_detail.html:653
+msgid "Final Approved Document"
+msgstr "Dokumen Final yang Disetujui"
+
+#: templates/contracts/contract_detail.html:656
+msgid "Upload"
+msgstr "Unggah"
+
+#: templates/contracts/contract_detail.html:663
+msgid "Signed Final Contract"
+msgstr "Kontrak Final yang Ditandatangani"
+
+#: templates/contracts/contract_detail.html:666
+msgid "Uploaded by"
+msgstr "Diunggah oleh"
+
+#: templates/contracts/contract_detail.html:667
+msgid "Date"
+msgstr "Tanggal"
+
+#: templates/contracts/contract_detail.html:670
+msgid "Download Final Document"
+msgstr "Unduh Dokumen Final"
+
+#: templates/contracts/contract_detail.html:674
+#: templates/contracts/contract_detail.html:795
+#: templates/contracts/contract_form.html:178
+msgid "Notes"
+msgstr "Catatan"
+
+#: templates/contracts/contract_detail.html:679
+msgid "No final approved document uploaded yet."
+msgstr "Belum ada dokumen final yang diunggah."
+
+#: templates/contracts/contract_detail.html:681
+msgid "Upload is available only when status is Approved and by Legal reviewer."
+msgstr "Unggah hanya tersedia ketika status Disetujui dan oleh peninjau Legal."
+
+#: templates/contracts/contract_detail.html:690
+msgid "Audit Log"
+msgstr "Log Audit"
+
+#: templates/contracts/contract_detail.html:707
+msgid "No audit logs"
+msgstr "Tidak ada log audit"
+
+#: templates/contracts/contract_detail.html:720
+#: templates/contracts/contract_detail.html:737
+msgid "Add Participant"
+msgstr "Tambah Peserta"
+
+#: templates/contracts/contract_detail.html:727
+msgid "User"
+msgstr "Pengguna"
+
+#: templates/contracts/contract_detail.html:731
+msgid "Role"
+msgstr "Peran"
+
+#: templates/contracts/contract_detail.html:749
+#: templates/contracts/contract_detail.html:770
+msgid "Add Document"
+msgstr "Tambah Dokumen"
+
+#: templates/contracts/contract_detail.html:760
+#: templates/contracts/contract_detail.html:790
+msgid "Document"
+msgstr "Dokumen"
+
+#: templates/contracts/contract_detail.html:782
+msgid "Upload Final Signed Contract"
+msgstr "Unggah Kontrak Final yang Ditandatangani"
+
+#: templates/contracts/contract_detail.html:788
+msgid "Upload the final signed and approved contract document."
+msgstr "Unggah dokumen kontrak final yang telah ditandatangani dan disetujui."
+
+#: templates/contracts/contract_detail.html:792
+msgid "Accepted formats: PDF, Word documents"
+msgstr "Format yang diterima: PDF, dokumen Word"
+
+#: templates/contracts/contract_detail.html:802
+msgid "Upload Document"
+msgstr "Unggah Dokumen"
+
+#: templates/contracts/contract_detail.html:821
+msgid "This action cannot be undone!"
+msgstr "Tindakan ini tidak dapat dibatalkan!"
+
+#: templates/contracts/contract_form.html:4
+#: templates/contracts/contract_form.html:5
+#: templates/contracts/contract_form.html:14
+#: templates/contracts/contract_form.html:187
+msgid "Contract"
+msgstr "Kontrak"
+
+#: templates/contracts/contract_form.html:20
+msgid "Please correct the errors below:"
+msgstr "Mohon perbaiki kesalahan berikut:"
+
+#: templates/contracts/contract_form.html:34
+msgid "Contract Title"
+msgstr "Judul Kontrak"
+
+#: templates/contracts/contract_form.html:44
+msgid "Contract Type"
+msgstr "Jenis Kontrak"
+
+#: templates/contracts/contract_form.html:51
+msgid "Target Value (IDR)"
+msgstr "Nilai Target (IDR)"
+
+#: templates/contracts/contract_form.html:53
+msgid "Format: 1,000,000"
+msgstr "Format: 1.000.000"
+
+#: templates/contracts/contract_form.html:59
+msgid "Legal Entity Name (PT / CV / Others)"
+msgstr "Nama Entitas Legal (PT / CV / Lainnya)"
+
+#: templates/contracts/contract_form.html:67
+msgid "CV Code"
+msgstr "Kode CV"
+
+#: templates/contracts/contract_form.html:84
+msgid "Distributor Agreement Fields"
+msgstr "Bidang Perjanjian Distributor"
+
+#: templates/contracts/contract_form.html:86
+msgid "General Trade Agreement Fields"
+msgstr "Bidang Perjanjian General Trade"
+
+#: templates/contracts/contract_form.html:88
+msgid "Contract Structured Data Fields"
+msgstr "Bidang Data Terstruktur Kontrak"
+
+#: templates/contracts/contract_form.html:93
+msgid ""
+"Tip: auto-calculated fields are read-only. The form uses two columns to "
+"reduce vertical stacking on edit."
+msgstr "Tips: bidang yang dihitung otomatis bersifat hanya-baca. Formulir menggunakan dua kolom untuk mengurangi tumpukan vertikal saat pengeditan."
+
+#: templates/contracts/contract_form.html:123
+msgid "Duration (days)"
+msgstr "Durasi (hari)"
+
+#: templates/contracts/contract_form.html:136
+msgid "Auto-calculated from Start Date + Duration (days)."
+msgstr "Dihitung otomatis dari Tanggal Mulai + Durasi (hari)."
+
+#: templates/contracts/contract_form.html:142
+msgid "Additional Documents"
+msgstr "Dokumen Tambahan"
+
+#: templates/contracts/contract_form.html:148
+#: templates/contracts/contract_form.html:156
+#: templates/contracts/contract_form.html:164
+msgid "Document Title"
+msgstr "Judul Dokumen"
+
+#: templates/contracts/contract_form.html:172
+msgid "Add another document"
+msgstr "Tambah dokumen lainnya"
+
+#: templates/contracts/contract_list.html:5
+msgid "Contracts"
+msgstr "Kontrak"
+
+#: templates/contracts/contract_list.html:14
+msgid "Create New"
+msgstr "Buat Baru"
+
+#: templates/contracts/contract_list.html:38
+msgid "Filter"
+msgstr "Filter"
+
+#: templates/contracts/contract_list.html:48
+#: templates/contracts/sign_contract.html:34
+msgid "Clear"
+msgstr "Bersihkan"
+
+#: templates/contracts/contract_list.html:65
+msgid "Days to Expiry"
+msgstr "Hari Menuju Berakhir"
+
+#: templates/contracts/contract_list.html:67
+#: templates/contracts/expired_contracts.html:30
+#: templates/contracts/expiring_contracts.html:34
+#: templates/contracts/terminated_contracts.html:36
+msgid "Actions"
+msgstr "Aksi"
+
+#: templates/contracts/contract_list.html:94
+#: templates/contracts/dashboard.html:118
+msgid "Expired"
+msgstr "Sudah Berakhir"
+
+#: templates/contracts/contract_list.html:122
+msgid "No contracts found."
+msgstr "Tidak ada kontrak ditemukan."
+
+#: templates/contracts/contract_list.html:122
+msgid "Create your first contract"
+msgstr "Buat kontrak pertama Anda"
+
+#: templates/contracts/dashboard.html:15
+msgid "Total Contracts"
+msgstr "Total Kontrak"
+
+#: templates/contracts/dashboard.html:23
+msgid "Active Contracts"
+msgstr "Kontrak Aktif"
+
+#: templates/contracts/dashboard.html:39
+msgid "Draft Contracts"
+msgstr "Kontrak Draf"
+
+#: templates/contracts/dashboard.html:52
+msgid "Legal Review Queue"
+msgstr "Antrean Tinjauan Legal"
+
+#: templates/contracts/dashboard.html:64
+msgid "Expiry Overview"
+msgstr "Ringkasan Masa Berakhir"
+
+#: templates/contracts/dashboard.html:77
+msgid "Expiring in 60 days"
+msgstr "Berakhir dalam 60 hari"
+
+#: templates/contracts/dashboard.html:83
+msgid "Expiring in 90 days"
+msgstr "Berakhir dalam 90 hari"
+
+#: templates/contracts/dashboard.html:98
+msgid "Needs Attention"
+msgstr "Perlu Perhatian"
+
+#: templates/contracts/dashboard.html:116
+#, python-format
+msgid "Expires in %(days)s days"
+msgstr "Berakhir dalam %(days)s hari"
+
+#: templates/contracts/dashboard.html:126
+msgid "No contracts need immediate attention"
+msgstr "Tidak ada kontrak yang perlu perhatian segera"
+
+#: templates/contracts/dashboard.html:136
+msgid "Recent Contracts"
+msgstr "Kontrak Terbaru"
+
+#: templates/contracts/dashboard.html:137
+#: templates/contracts/dashboard.html:181
+msgid "View All"
+msgstr "Lihat Semua"
+
+#: templates/contracts/dashboard.html:156
+msgid "No contracts yet"
+msgstr "Belum ada kontrak"
+
+#: templates/contracts/dashboard.html:168
+msgid "Quick Actions"
+msgstr "Aksi Cepat"
+
+#: templates/contracts/expired_contracts.html:5
+#: templates/contracts/expired_contracts.html:6
+#: templates/contracts/expired_contracts.html:12
+msgid "Expired Contracts"
+msgstr "Kontrak Kedaluwarsa"
+
+#: templates/contracts/expired_contracts.html:29
+msgid "Days Since Expiry"
+msgstr "Hari Sejak Kedaluwarsa"
+
+#: templates/contracts/expired_contracts.html:46
+msgid "%(days)s days ago"
+msgstr "%(days)s hari yang lalu"
+
+#: templates/contracts/expired_contracts.html:62
+msgid "No expired contracts"
+msgstr "Belum ada kontrak kedaluwarsa"
+
+#: templates/contracts/expired_contracts.html:63
+msgid "Great job keeping your contracts up to date!"
+msgstr "Bagus! Kontrak Anda selalu terjaga."
+
+#: templates/contracts/expiring_contracts.html:4
+msgid "Expiring Contracts"
+msgstr "Kontrak yang Akan Kedaluwarsa"
+
+#: templates/contracts/expiring_contracts.html:5
+#: templates/contracts/expiring_contracts.html:12
+msgid "Contracts Expiring Soon"
+msgstr "Kontrak yang Akan Segera Kedaluwarsa"
+
+#: templates/contracts/expiring_contracts.html:21
+#, python-format
+msgid "Showing contracts expiring within %(days)s days"
+msgstr "Menampilkan kontrak yang berakhir dalam %(days)s hari"
+
+#: templates/contracts/expiring_contracts.html:32
+msgid "Days Remaining"
+msgstr "Sisa Hari"
+#: templates/contracts/expiring_contracts.html:33
+msgid "Auto-Renew"
+msgstr "Perpanjang Otomatis"
+
+#: templates/contracts/expiring_contracts.html:55
+msgid "Yes"
+msgstr "Ya"
+
+#: templates/contracts/expiring_contracts.html:57
+msgid "No"
+msgstr "Tidak"
+
+#: templates/contracts/expiring_contracts.html:73
+msgid "No contracts expiring soon"
+msgstr "Belum ada kontrak yang akan kedaluwarsa"
+
+#: templates/contracts/expiring_contracts.html:74
+msgid "All your contracts are well managed!"
+msgstr "Semua kontrak Anda dikelola dengan baik!"
+
+#: templates/contracts/login.html:4 templates/contracts/login.html:28
+msgid "Login"
+msgstr "Masuk"
+
+#: templates/contracts/login.html:14
+msgid "Contract Lifecycle Management"
+msgstr "Manajemen Siklus Hidup Kontrak"
+
+#: templates/contracts/login.html:20
+msgid "Username"
+msgstr "Nama Pengguna"
+
+#: templates/contracts/login.html:24
+msgid "Password"
+msgstr "Kata Sandi"
+
+#: templates/contracts/role_permissions.html:4
+#: templates/contracts/role_permissions.html:5
+msgid "Roles & Permissions"
+msgstr "Peran & Izin"
+
+#: templates/contracts/role_permissions.html:11
+msgid "Access Control"
+msgstr "Kontrol Akses"
+
+#: templates/contracts/role_permissions.html:12
+msgid "Changes apply immediately"
+msgstr "Perubahan berlaku segera"
+
+#: templates/contracts/role_permissions.html:15
+msgid "Turn permissions on or off for each role."
+msgstr "Aktifkan atau nonaktifkan izin untuk setiap peran."
+
+#: templates/contracts/role_permissions.html:22
+msgid "Permission"
+msgstr "Izin"
+
+#: templates/contracts/role_permissions.html:68
+msgid "Save Changes"
+msgstr "Simpan Perubahan"
+
+#: templates/contracts/sign_contract.html:4
+#: templates/contracts/sign_contract.html:5
+#: templates/contracts/sign_contract.html:50
+msgid "Sign Contract"
+msgstr "Tanda Tangan Kontrak"
+
+#: templates/contracts/sign_contract.html:13
+msgid "Digital Signature"
+msgstr "Tanda Tangan Digital"
+
+#: templates/contracts/sign_contract.html:21
+msgid ""
+"Please sign below to acknowledge and agree to the terms of this contract."
+msgstr "Silakan tanda tangani di bawah untuk menyatakan bahwa Anda memahami dan menyetujui syarat kontrak ini."
+
+#: templates/contracts/sign_contract.html:28
+msgid "Draw your signature:"
+msgstr "Gambarkan tanda tangan Anda:"
+
+#: templates/contracts/sign_contract.html:42
+msgid "Legal Notice"
+msgstr "Pemberitahuan Hukum"
+
+#: templates/contracts/sign_contract.html:42
+msgid ""
+"By signing this document, you agree that your electronic signature is the "
+"legal equivalent of your manual signature and has the same validity and "
+"effect."
+msgstr "Dengan menandatangani dokumen ini, Anda setuju bahwa tanda tangan elektronik Anda setara secara hukum dengan tanda tangan manual dan memiliki keabsahan serta akibat yang sama."
+
+#: templates/contracts/terminated_contracts.html:5
+#: templates/contracts/terminated_contracts.html:6
+#: templates/contracts/terminated_contracts.html:12
+msgid "Terminated Contracts"
+msgstr "Kontrak Dihentikan"
+
+#: templates/contracts/terminated_contracts.html:35
+msgid "Last Updated"
+msgstr "Terakhir Diperbarui"
+
+#: templates/contracts/terminated_contracts.html:70
+msgid "No terminated contracts"
+msgstr "Belum ada kontrak yang dihentikan"
+
+#: templates/contracts/terminated_contracts.html:71
+msgid "No contracts have been terminated yet."
+msgstr "Belum ada kontrak yang dihentikan."
+
+#: templates/contracts/terminated_contracts.html:73
+msgid "View All Contracts"
+msgstr "Lihat Semua Kontrak"
+
+#: templates/contracts/wizard_step1_entity_type.html:4
+msgid "Step 1"
+msgstr "Langkah 1"
+
+#: templates/contracts/wizard_step1_entity_type.html:14
+#: templates/contracts/wizard_step2_documents.html:14
+#: templates/contracts/wizard_step3_contract_info.html:14
+#: templates/contracts/wizard_step4_structured_data.html:14
+msgid "Contract Wizard"
+msgstr "Wizard Kontrak"
+
+#: templates/contracts/wizard_step1_entity_type.html:15
+msgid "Step 1 of 4"
+msgstr "Langkah 1 dari 4"
+
+#: templates/contracts/wizard_step1_entity_type.html:21
+#: templates/contracts/wizard_step2_documents.html:21
+#: templates/contracts/wizard_step3_contract_info.html:21
+#: templates/contracts/wizard_step4_structured_data.html:21
+msgid "1. Entity Type"
+msgstr "1. Jenis Entitas"
+
+#: templates/contracts/wizard_step1_entity_type.html:22
+#: templates/contracts/wizard_step2_documents.html:22
+#: templates/contracts/wizard_step3_contract_info.html:22
+#: templates/contracts/wizard_step4_structured_data.html:22
+msgid "2. Admin Docs"
+msgstr "2. Dok. Admin"
+
+#: templates/contracts/wizard_step1_entity_type.html:23
+#: templates/contracts/wizard_step2_documents.html:23
+#: templates/contracts/wizard_step3_contract_info.html:23
+#: templates/contracts/wizard_step4_structured_data.html:23
+msgid "3. Contract Info"
+msgstr "3. Info Kontrak"
+
+#: templates/contracts/wizard_step1_entity_type.html:24
+#: templates/contracts/wizard_step2_documents.html:24
+#: templates/contracts/wizard_step3_contract_info.html:24
+#: templates/contracts/wizard_step4_structured_data.html:24
+msgid "4. Structured Data"
+msgstr "4. Data Terstruktur"
+
+#: templates/contracts/wizard_step1_entity_type.html:31
+msgid "Select Business Entity Type"
+msgstr "Pilih Jenis Entitas Bisnis"
+
+#: templates/contracts/wizard_step1_entity_type.html:32
+msgid "Start by choosing the legal form of the partner company."
+msgstr "Mulai dengan memilih bentuk legal perusahaan mitra."
+
+#: templates/contracts/wizard_step1_entity_type.html:36
+#: templates/contracts/wizard_step2_documents.html:36
+#: templates/contracts/wizard_step3_contract_info.html:36
+#: templates/contracts/wizard_step4_structured_data.html:51
+msgid "Hint"
+msgstr "Petunjuk"
+
+#: templates/contracts/wizard_step1_entity_type.html:36
+msgid ""
+"This selection controls which administrative documents will be required in "
+"the next step."
+msgstr "Pilihan ini menentukan dokumen administratif mana yang akan diperlukan pada langkah berikutnya."
+
+#: templates/contracts/wizard_step1_entity_type.html:59
+#: templates/contracts/wizard_step2_documents.html:62
+#: templates/contracts/wizard_step3_contract_info.html:89
+msgid "Continue"
+msgstr "Lanjutkan"
+
+#: templates/contracts/wizard_step2_documents.html:4
+msgid "Step 2"
+msgstr "Langkah 2"
+
+#: templates/contracts/wizard_step2_documents.html:15
+msgid "Step 2 of 4"
+msgstr "Langkah 2 dari 4"
+
+#: templates/contracts/wizard_step2_documents.html:31
+msgid "Upload Administrative Documents"
+msgstr "Unggah Dokumen Administratif"
+
+#: templates/contracts/wizard_step2_documents.html:36
+msgid ""
+"Only files relevant to the selected entity type are shown here. Supported "
+"formats: PDF, JPG, JPEG, PNG."
+msgstr "Hanya file yang relevan dengan jenis entitas yang dipilih yang ditampilkan di sini. Format yang didukung: PDF, JPG, JPEG, PNG."
+
+#: templates/contracts/wizard_step2_documents.html:59
+#: templates/contracts/wizard_step3_contract_info.html:86
+#: templates/contracts/wizard_step4_structured_data.html:271
+#: templates/contracts/wizard_step4_structured_data.html:281
+msgid "Back"
+msgstr "Kembali"
+
+#: templates/contracts/wizard_step3_contract_info.html:4
+msgid "Step 3"
+msgstr "Langkah 3"
+
+#: templates/contracts/wizard_step3_contract_info.html:15
+msgid "Step 3 of 4"
+msgstr "Langkah 3 dari 4"
+
+#: templates/contracts/wizard_step3_contract_info.html:31
+msgid "Fill Contract Details"
+msgstr "Isi Detail Kontrak"
+
+#: templates/contracts/wizard_step3_contract_info.html:32
+msgid ""
+"Provide core contract information before final structured data submission."
+msgstr "Berikan informasi inti kontrak sebelum pengiriman data terstruktur terakhir."
+
+#: templates/contracts/wizard_step3_contract_info.html:36
+msgid "Add complete party and date details to reduce legal revision cycles."
+msgstr "Tambahkan detail pihak dan tanggal yang lengkap untuk mengurangi siklus revisi legal."
+
+#: templates/contracts/wizard_step3_contract_info.html:39
+msgid "Contract Period Rule"
+msgstr "Aturan Periode Kontrak"
+
+#: templates/contracts/wizard_step3_contract_info.html:39
+msgid ""
+"Select <strong>Start Date</strong> and fill <strong>Duration (days)</"
+"strong>. <strong>End Date</strong> is calculated automatically."
+msgstr "Pilih <strong>Tanggal Mulai</strong> dan isi <strong>Durasi (hari)</strong>. <strong>Tanggal Berakhir</strong> dihitung otomatis."
+
+#: templates/contracts/wizard_step3_contract_info.html:63
+msgid "Additional Documents (Optional)"
+msgstr "Dokumen Tambahan (Opsional)"
+
+#: templates/contracts/wizard_step3_contract_info.html:68
+#: templates/contracts/wizard_step3_contract_info.html:76
+msgid "Document title"
+msgstr "Judul dokumen"
+
+#: templates/contracts/wizard_step4_structured_data.html:4
+msgid "Step 4"
+msgstr "Langkah 4"
+
+#: templates/contracts/wizard_step4_structured_data.html:15
+msgid "Final Step"
+msgstr "Langkah Terakhir"
+
+#: templates/contracts/wizard_step4_structured_data.html:32
+msgid "Complete the final fields to generate and submit the contract package."
+msgstr "Lengkapi bidang terakhir untuk membuat dan mengirimkan paket kontrak."
+
+#: templates/contracts/wizard_step4_structured_data.html:41
+#: templates/contracts/wizard_step4_structured_data.html:78
+msgid "Auto-filled from previous steps"
+msgstr "Diisi otomatis dari langkah sebelumnya"
+
+#: templates/contracts/wizard_step4_structured_data.html:51
+msgid "Required fields must be filled to avoid validation failure and rework."
+msgstr "Bidang wajib harus diisi untuk menghindari kegagalan validasi."
+
+#: templates/contracts/wizard_step4_structured_data.html:56
+msgid "Cannot create contract yet."
+msgstr "Belum dapat membuat kontrak."
+
+#: templates/contracts/wizard_step4_structured_data.html:72
+msgid "Distributor quick guide"
+msgstr "Panduan cepat distributor"
+
+#: templates/contracts/wizard_step4_structured_data.html:72
+msgid ""
+"Fill sections from top to bottom. This layout is grouped by agreement parts "
+"to reduce scrolling and confusion."
+msgstr "Isi bagian dari atas ke bawah. Tata letak ini dikelompokkan berdasarkan bagian perjanjian untuk mengurangi pengguliran dan kebingungan."
+
+#: templates/contracts/wizard_step4_structured_data.html:79
+msgid "No input needed"
+msgstr "Tidak perlu input"
+
+#: templates/contracts/wizard_step4_structured_data.html:101
+msgid "Completion Progress"
+msgstr "Progres Penyelesaian"
+
+#: templates/contracts/wizard_step4_structured_data.html:119
+msgid "Party & Legal Information"
+msgstr "Informasi Pihak & Legal"
+
+#: templates/contracts/wizard_step4_structured_data.html:173
+msgid "Lampiran B - Target Sales"
+msgstr "Lampiran B - Target Penjualan"
+
+#: templates/contracts/wizard_step4_structured_data.html:200
+msgid "Lampiran C - Incentive Scheme"
+msgstr "Lampiran C - Skema Insentif"
+
+#: templates/contracts/wizard_step4_structured_data.html:227
+msgid "Additional Fields"
+msgstr "Bidang Tambahan"
+
+#: templates/contracts/wizard_step4_structured_data.html:228
+msgid "Auto-detected"
+msgstr "Terdeteksi otomatis"
+
+#: templates/contracts/wizard_step4_structured_data.html:274
+msgid "Finish and Create Contract"
+msgstr "Selesaikan dan Buat Kontrak"
+
+#: templates/contracts/wizard_step4_structured_data.html:279
+msgid "No structured data fields are configured for this contract type."
+msgstr "Tidak ada bidang data terstruktur yang dikonfigurasi untuk jenis kontrak ini."
+
+#: templates/contracts/wizard_step4_structured_data.html:282
+msgid "Go to Contract Detail"
+msgstr "Buka Detail Kontrak"

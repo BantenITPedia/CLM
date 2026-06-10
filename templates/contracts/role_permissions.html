@@ -1,24 +1,25 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Roles & Permissions - Legal CLM{% endblock %}
-{% block page_title %}Roles & Permissions{% endblock %}
+{% block title %}{% trans "Roles & Permissions" %} - Legal CLM{% endblock %}
+{% block page_title %}{% trans "Roles & Permissions" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="card">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-shield-lock"></i> Access Control</h5>
-            <span class="text-muted small">Changes apply immediately</span>
+            <h5 class="mb-0"><i class="bi bi-shield-lock"></i> {% trans "Access Control" %}</h5>
+            <span class="text-muted small">{% trans "Changes apply immediately" %}</span>
         </div>
         <div class="card-body">
-            <p class="text-muted mb-3">Turn permissions on or off for each role.</p>
+            <p class="text-muted mb-3">{% trans "Turn permissions on or off for each role." %}</p>
             <form method="post">
                 {% csrf_token %}
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th style="min-width: 220px;">Permission</th>
+                                <th style="min-width: 220px;">{% trans "Permission" %}</th>
                                 {% for role_key, role_label in roles %}
                                 <th class="text-center">{{ role_label }}</th>
                                 {% endfor %}
@@ -64,7 +65,7 @@
                 </div>
                 <div class="d-flex justify-content-end">
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Save Changes
+                        <i class="bi bi-save"></i> {% trans "Save Changes" %}
                     </button>
                 </div>
             </form>

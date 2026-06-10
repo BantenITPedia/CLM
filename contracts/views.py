@@ -13,14 +13,15 @@ from .models import (
     Contract, ContractParticipant, ContractSignature,
     ContractDocument, FinalApprovedDocument, Comment, AuditLog, ContractStatus,
     ContractField, ContractData, ContractTemplate, ContractDraft,
-    ContractTypeDefinition, ContractDataFile, ContractType
+    ContractTypeDefinition, ContractDataFile, ContractType,
+    BusinessEntityDocument, CompanyProfile, DocumentRevisionRequest
 )
 from .forms import (
     ContractForm, ContractStatusUpdateForm, ContractParticipantForm,
     ContractDocumentForm, CommentForm, ContractFilterForm,
-    ContractDataForm, ContractTypeSelectForm
+    ContractDataForm, ContractTypeSelectForm, ContractNumberOverrideForm
 )
-from .services import EmailService
+from .services import EmailService, ContractNumberService
 from .permissions import (
     can_view_contract,
     can_edit_contract,
@@ -32,7 +33,101 @@ from .permissions import (
     can_edit_contract_data,
     can_regenerate_draft,
     has_contract_permission,
+    get_allowed_next_statuses,
+    can_transition_to_status,
+    require_global_permission,
+    GlobalPermission,
+    is_legal_team_user,
 )
+
+
+def _get_template_field_definitions(type_definition):
+    """Return template fields excluding fixed/auto-managed inputs."""
+    field_definitions = type_definition.fields.exclude(
+        field_key__iregex=r'^(contract_number|no_contract|product_types|incentive_percentage)$'
+    )
+
+    if type_definition.code in {ContractType.GENERAL_TRADE, ContractType.GENERAL_TRADE_PREMIUM}:
+        field_definitions = field_definitions.exclude(field_key__iexact='party_b_representative_name')
+
+    return field_definitions.order_by('position', 'label')
+
+
+def _supports_contract_number():
+    return any(field.name == 'contract_number' for field in Contract._meta.fields)
+
+
+def _get_contract_number(contract):
+    if not _supports_contract_number() or not contract:
+        return ''
+    return getattr(contract, 'contract_number', '') or ''
+
+
+def _set_contract_number(contract, value):
+    if _supports_contract_number() and contract:
+        contract.contract_number = value
+
+
+def _extract_cv_code(contract):
+    if not contract:
+        return ''
+
+    latest_data = contract.structured_data_versions.first()
+    if not latest_data:
+        return ''
+
+    payload = latest_data.data or {}
+    return (payload.get('cvcode_number') or payload.get('cvcodenumber') or '').strip()
+    
+def _notify_contract_activity(contract, actor, action_title, details='', event_key=None):
+    """Best-effort activity notification dispatch."""
+    try:
+        EmailService.send_contract_activity_email(
+            contract=contract,
+            action_title=action_title,
+            actor=actor,
+            details=details,
+            event_key=event_key,
+        )
+    except Exception:
+        # Notifications should never block core user actions.
+        pass
+
+
+def _can_assign_contract_number(user, contract):
+    """Allow legal/staff to assign missing contract number from detail page."""
+    if not user or not user.is_authenticated or not contract:
+        return False
+
+    if _get_contract_number(contract):
+        return False
+
+    if contract.status not in {
+        ContractStatus.APPROVED,
+        ContractStatus.ACTIVE,
+        ContractStatus.EXPIRING_SOON,
+    }:
+        return False
+
+    if not has_contract_permission(user, contract, 'update_status'):
+        return False
+
+    if user.is_staff or user.is_superuser:
+        return True
+
+    return contract.participants.filter(
+        user=user,
+        role='LEGAL',
+        is_active=True
+    ).exists()
+
+
+def _gt_variant_suffix(contract_type_code):
+    if contract_type_code == ContractType.GENERAL_TRADE:
+        return 'regular'
+    if contract_type_code == ContractType.GENERAL_TRADE_PREMIUM:
+        return 'premium'
+    return ''
 
 
 def login_view(request):
@@ -66,56 +161,76 @@ def logout_view(request):
 def dashboard(request):
     """Main dashboard with contract statistics"""
     today = timezone.now().date()
+    review_queue_statuses = [ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW]
+    is_legal_team = is_legal_team_user(request.user)
     
-    # Get user's contracts (owned or participating)
-    user_contracts = Contract.objects.filter(
-        Q(owner=request.user) | Q(participants__user=request.user)
-    ).distinct()
+    # Legal/admin users can see all contracts; others only their own scope.
+    if is_legal_team:
+        user_contracts = Contract.objects.all()
+    else:
+        user_contracts = Contract.objects.filter(
+            Q(owner=request.user) | Q(participants__user=request.user)
+        ).distinct()
     
     # Statistics
     total_contracts = user_contracts.count()
-    active_contracts = user_contracts.filter(status=ContractStatus.ACTIVE).count()
-    expiring_soon_contracts = user_contracts.filter(status=ContractStatus.EXPIRING_SOON).count()
-    legal_review_contracts = user_contracts.filter(status=ContractStatus.LEGAL_REVIEW).count()
-    
-    # Expiring in different periods (ACTIVE or EXPIRING_SOON contracts)
-    expiring_30 = user_contracts.filter(
+    active_contracts = user_contracts.filter(status__in=[ContractStatus.ACTIVE, ContractStatus.APPROVED]).count()
+    expiring_soon_contracts = user_contracts.filter(
         end_date__gte=today,
         end_date__lte=today + timedelta(days=30),
-        status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
+        status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
     ).count()
+    legal_review_contracts = user_contracts.filter(status__in=review_queue_statuses).count()
+    draft_contracts = user_contracts.filter(status=ContractStatus.DRAFT).count()
     
+    # Expiring in different periods (APPROVED, ACTIVE or EXPIRING_SOON contracts)
     expiring_60 = user_contracts.filter(
         end_date__gte=today + timedelta(days=31),
         end_date__lte=today + timedelta(days=60),
-        status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
+        status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
     ).count()
     
     expiring_90 = user_contracts.filter(
         end_date__gte=today + timedelta(days=61),
         end_date__lte=today + timedelta(days=90),
-        status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
+        status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
     ).count()
     
     # Recent contracts
     recent_contracts = user_contracts.order_by('-created_at')[:10]
     
-    # Contracts needing attention (in legal review, submitted, expiring, or expiring soon)
-    needs_attention = user_contracts.filter(
-        Q(status=ContractStatus.LEGAL_REVIEW) |
-        Q(status=ContractStatus.SUBMITTED) |
-        Q(status=ContractStatus.EXPIRING_SOON) |
-        Q(status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON],
-          end_date__gte=today,
-          end_date__lte=today + timedelta(days=30))
-    ).distinct().order_by('end_date', '-created_at')[:5]
+    # Contracts needing attention:
+    # - Legal/admin users: review queue + urgent expiry
+    # - Other users: urgent expiry only (avoid showing long-period submitted items)
+    if is_legal_team:
+        needs_attention_filter = (
+            Q(status__in=review_queue_statuses) |
+            Q(status=ContractStatus.EXPIRING_SOON) |
+            Q(
+                status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON],
+                end_date__gte=today,
+                end_date__lte=today + timedelta(days=30),
+            )
+        )
+    else:
+        needs_attention_filter = (
+            Q(status=ContractStatus.EXPIRING_SOON) |
+            Q(
+                status__in=[ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON],
+                end_date__gte=today,
+                end_date__lte=today + timedelta(days=30),
+            )
+        )
+
+    needs_attention = user_contracts.filter(needs_attention_filter).distinct().order_by('end_date', '-created_at')[:5]
     
     context = {
         'total_contracts': total_contracts,
         'active_contracts': active_contracts,
         'expiring_soon_contracts': expiring_soon_contracts,
         'legal_review_contracts': legal_review_contracts,
-        'expiring_30': expiring_30,
+        'draft_contracts': draft_contracts,
+        'is_legal_team': is_legal_team,
         'expiring_60': expiring_60,
         'expiring_90': expiring_90,
         'recent_contracts': recent_contracts,
@@ -128,10 +243,46 @@ def dashboard(request):
 @login_required
 def contract_list(request):
     """List all contracts with filtering"""
-    contracts = Contract.objects.filter(
-        Q(owner=request.user) | Q(participants__user=request.user)
-    ).distinct().order_by('-created_at')
+    # Legal/admin users can see all contracts; others only their own scope.
+    if is_legal_team_user(request.user):
+        contracts = Contract.objects.all().order_by('-created_at')
+    else:
+        contracts = Contract.objects.filter(
+            Q(owner=request.user) | Q(participants__user=request.user)
+        ).distinct().order_by('-created_at')
     
+    today = timezone.now().date()
+
+    # Apply quick filters from dashboard cards.
+    dashboard_filter = (request.GET.get('dashboard_filter') or '').strip().lower()
+    if dashboard_filter == 'active':
+        contracts = contracts.filter(status__in=[ContractStatus.ACTIVE, ContractStatus.APPROVED])
+    elif dashboard_filter == 'expiring':
+        contracts = contracts.filter(
+            end_date__gte=today,
+            end_date__lte=today + timedelta(days=30),
+            status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
+        )
+    elif dashboard_filter == 'expiring_60':
+        contracts = contracts.filter(
+            end_date__gte=today + timedelta(days=31),
+            end_date__lte=today + timedelta(days=60),
+            status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
+        )
+    elif dashboard_filter == 'expiring_90':
+        contracts = contracts.filter(
+            end_date__gte=today + timedelta(days=61),
+            end_date__lte=today + timedelta(days=90),
+            status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
+        )
+    elif dashboard_filter == 'submitted':
+        # Backward-compatible URL value from legacy dashboard card.
+        contracts = contracts.filter(status__in=[ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW])
+    elif dashboard_filter == 'legal_review':
+        contracts = contracts.filter(status=ContractStatus.LEGAL_REVIEW)
+    elif dashboard_filter == 'draft':
+        contracts = contracts.filter(status=ContractStatus.DRAFT)
+
     # Apply filters
     form = ContractFilterForm(request.GET)
     if form.is_valid():
@@ -157,6 +308,9 @@ def contract_list(request):
                 Q(party_b__icontains=search) |
                 Q(description__icontains=search)
             )
+
+        if request.GET.get('review_queue') == '1' and not form.cleaned_data.get('status'):
+            contracts = contracts.filter(status__in=[ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW])
     
     context = {
         'contracts': contracts,
@@ -176,10 +330,14 @@ def contract_create(request):
         ).first()
         if not type_def or not type_def.is_template_based:
             return None
-        return type_def.fields.all().order_by('position', 'label')
+        return _get_template_field_definitions(type_def)
 
     def apply_gt_defaults(contract_obj, data_dict):
         from decimal import Decimal
+
+        resolved_contract_number = _get_contract_number(contract_obj) or f"DRAFT-{contract_obj.id}"
+        data_dict['contract_number'] = resolved_contract_number
+        data_dict['no_contract'] = resolved_contract_number
 
         if not data_dict.get('party_b_name') and contract_obj.party_b:
             data_dict['party_b_name'] = contract_obj.party_b
@@ -248,11 +406,91 @@ def contract_create(request):
 
         return data_dict
 
+    def apply_distributor_defaults(contract_obj, data_dict):
+        """Distributor defaults intentionally avoid GT quarter auto-fill unless explicitly quarterly."""
+        resolved_contract_number = _get_contract_number(contract_obj) or f"DRAFT-{contract_obj.id}"
+        data_dict['contract_number'] = resolved_contract_number
+        data_dict['no_contract'] = resolved_contract_number
+
+        if contract_obj.party_b:
+            data_dict['party_b_name'] = contract_obj.party_b
+            data_dict['party_b_legal_name'] = contract_obj.party_b
+            # Lampiran A - Nama Tempat Pihak Kedua follows Party B legal name.
+            data_dict['second_party_place_name'] = contract_obj.party_b
+
+        if contract_obj.business_entity_type:
+            # Lampiran A - Kriteria Pihak Kedua follows selected business entity type.
+            data_dict['second_party_criteria'] = contract_obj.business_entity_type
+
+        if not data_dict.get('contract_start_date') and contract_obj.start_date:
+            data_dict['contract_start_date'] = contract_obj.start_date.strftime('%Y-%m-%d')
+
+        if not data_dict.get('contract_end_date') and contract_obj.end_date:
+            data_dict['contract_end_date'] = contract_obj.end_date.strftime('%Y-%m-%d')
+
+        if not data_dict.get('total_purchase_target') and contract_obj.contract_value:
+            data_dict['total_purchase_target'] = str(contract_obj.contract_value)
+
+        if contract_obj.start_date:
+            start_date = contract_obj.start_date
+            end_date = contract_obj.end_date
+
+            def add_months(date_obj, months):
+                month = date_obj.month - 1 + months
+                year = date_obj.year + month // 12
+                month = month % 12 + 1
+                day = min(date_obj.day, [31,
+                                         29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+                                         31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+                return date_obj.replace(year=year, month=month, day=day)
+
+            q1_start = start_date
+            q2_start = add_months(start_date, 3)
+            q3_start = add_months(start_date, 6)
+            q4_start = add_months(start_date, 9)
+
+            q1_end = q2_start - timedelta(days=1)
+            q2_end = q3_start - timedelta(days=1)
+            q3_end = q4_start - timedelta(days=1)
+            q4_end = end_date if end_date else add_months(start_date, 12) - timedelta(days=1)
+
+            def fmt(date_obj):
+                return date_obj.strftime('%d %b %Y')
+
+            if not data_dict.get('quarter_1_period'):
+                data_dict['quarter_1_period'] = f"{fmt(q1_start)} - {fmt(q1_end)}"
+            if not data_dict.get('quarter_2_period'):
+                data_dict['quarter_2_period'] = f"{fmt(q2_start)} - {fmt(q2_end)}"
+            if not data_dict.get('quarter_3_period'):
+                data_dict['quarter_3_period'] = f"{fmt(q3_start)} - {fmt(q3_end)}"
+            if not data_dict.get('quarter_4_period'):
+                data_dict['quarter_4_period'] = f"{fmt(q4_start)} - {fmt(q4_end)}"
+
+        return data_dict
+
+    def apply_type_defaults(contract_obj, data_dict):
+        if contract_obj.contract_type == ContractType.DISTRIBUTOR:
+            return apply_distributor_defaults(contract_obj, data_dict)
+        return apply_gt_defaults(contract_obj, data_dict)
+
+    def filter_field_definitions(contract_type, definitions):
+        if not definitions:
+            return definitions
+
+        if contract_type == ContractType.DISTRIBUTOR:
+            distributor_auto_keys = {
+                'second_party_place_name',
+                'second_party_criteria',
+            }
+            return definitions.exclude(field_key__in=distributor_auto_keys)
+
+        return definitions
+
     contract_type_code = request.POST.get('contract_type') or request.GET.get('contract_type') or ContractType.GENERAL_TRADE
 
     if request.method == 'POST':
-        form = ContractForm(request.POST, request.FILES)
-        field_definitions = get_field_definitions(contract_type_code)
+        form = ContractForm(request.POST, request.FILES, enforce_auto_period=True)
+        field_definitions = filter_field_definitions(contract_type_code, get_field_definitions(contract_type_code))
         data_form = ContractDataForm(request.POST, request.FILES, field_definitions=field_definitions) if field_definitions else None
 
         if form.is_valid():
@@ -273,7 +511,9 @@ def contract_create(request):
             contract.owner = request.user
             # Auto-set Party A if not provided
             if not contract.party_a:
-                contract.party_a = "PT. Your Company Name"
+                from .models import CompanyProfile
+                company = CompanyProfile.get_active()
+                contract.party_a = company.name if company else "PT. Your Company Name"
             contract.save()
 
             additional_docs = request.FILES.getlist('additional_documents')
@@ -308,7 +548,7 @@ def contract_create(request):
                     clean_data = {}
                 
                 # Apply auto-population for missing fields
-                auto_data = apply_gt_defaults(contract, clean_data)
+                auto_data = apply_type_defaults(contract, clean_data)
 
                 contract_data = ContractData.objects.create(
                     contract=contract,
@@ -318,7 +558,7 @@ def contract_create(request):
                 )
 
                 if contract.status == ContractStatus.DRAFT:
-                    contract.status = ContractStatus.SUBMITTED
+                    contract.status = ContractStatus.LEGAL_REVIEW
                     contract.save(update_fields=['status'])
 
                 AuditLog.objects.create(
@@ -329,6 +569,7 @@ def contract_create(request):
                 )
 
                 EmailService.send_data_submitted_email(contract, request.user)
+                EmailService.send_legal_review_email(contract)
                 _generate_contract_draft(contract, user=request.user)
 
             messages.success(request, f'Contract "{contract.title}" created successfully')
@@ -345,8 +586,8 @@ def contract_create(request):
                 }
             )
 
-    form = ContractForm(initial={'contract_type': contract_type_code})
-    field_definitions = get_field_definitions(contract_type_code)
+    form = ContractForm(initial={'contract_type': contract_type_code}, enforce_auto_period=True)
+    field_definitions = filter_field_definitions(contract_type_code, get_field_definitions(contract_type_code))
     data_form = ContractDataForm(field_definitions=field_definitions) if field_definitions else None
     return render(
         request,
@@ -372,20 +613,86 @@ def contract_detail(request, pk):
     # Get related data
     participants = contract.participants.filter(is_active=True)
     documents = contract.additional_documents.all()
+    business_entity_documents = contract.business_entity_documents.all()
+    open_revision_document_ids = list(
+        DocumentRevisionRequest.objects.filter(
+            document__contract=contract,
+            status__in=[
+                DocumentRevisionRequest.RevisionStatus.PENDING,
+                DocumentRevisionRequest.RevisionStatus.REVISED,
+            ]
+        ).values_list('document_id', flat=True).distinct()
+    )
     comments = contract.comments.all()
     audit_logs = contract.audit_logs.order_by('-timestamp')[:20]
     contract_data = contract.structured_data_versions.first()
     all_data_versions = contract.structured_data_versions.all()
-    drafts = contract.drafts.all()
+    latest_draft = contract.drafts.order_by('-version', '-created_at').first()
+
+    structured_data_display = None
+    if contract_data and contract_data.data:
+        structured_data_display = dict(contract_data.data)
+        resolved_contract_number = (
+            _get_contract_number(contract)
+            or structured_data_display.get('contract_number')
+            or structured_data_display.get('no_contract')
+            or f"DRAFT-{contract.id}"
+        )
+        structured_data_display['contract_number'] = resolved_contract_number
+        structured_data_display['no_contract'] = resolved_contract_number
     
-    # Check if user can upload final document
-    can_upload_final = has_contract_permission(request.user, contract, 'upload_final_document')
+    allowed_next_statuses = get_allowed_next_statuses(request.user, contract)
+    can_update_status = bool(allowed_next_statuses)
+    can_edit_structured_data = can_edit_contract_data(request.user, contract)
+    can_review_document_revisions = (
+        is_legal_team_user(request.user)
+        or contract.participants.filter(
+            user=request.user,
+            role='LEGAL',
+            is_active=True,
+        ).exists()
+    )
+    # Request data revision: legal can ask owner to fix structured data
+    # (sends contract back to DRAFT, same pattern as document revision request)
+    can_request_data_revision = (
+        bool(contract_data)
+        and can_review_document_revisions
+        and contract.status in {ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW}
+    )
+    # Explicit legal final-decision flags for LEGAL_REVIEW state
+    can_legal_approve = (
+        can_update_status
+        and can_transition_to_status(request.user, contract, ContractStatus.APPROVED)
+    )
+    can_legal_terminate = (
+        can_update_status
+        and can_transition_to_status(request.user, contract, ContractStatus.TERMINATED)
+        and contract.status == ContractStatus.LEGAL_REVIEW
+    )
+
+    is_legal_final_uploader = (
+        is_legal_team_user(request.user)
+        or contract.participants.filter(
+            user=request.user,
+            role='LEGAL',
+            is_active=True,
+        ).exists()
+    )
+
+    # Upload final is legal-only and only when status is Approved.
+    can_upload_final = (
+        has_contract_permission(request.user, contract, 'upload_final_document')
+        and is_legal_final_uploader
+        and contract.status == ContractStatus.APPROVED
+    )
     
     # Forms
     comment_form = CommentForm()
     document_form = ContractDocumentForm()
     participant_form = ContractParticipantForm()
-    status_form = ContractStatusUpdateForm(instance=contract)
+    status_form = ContractStatusUpdateForm(instance=contract, user=request.user, contract=contract)
+    can_assign_contract_number = _can_assign_contract_number(request.user, contract)
+    contract_number_form = ContractNumberOverrideForm(contract=contract) if can_assign_contract_number else None
     
     # Final approved document form
     from .forms import FinalApprovedDocumentForm
@@ -395,17 +702,28 @@ def contract_detail(request, pk):
         'contract': contract,
         'participants': participants,
         'documents': documents,
+        'business_entity_documents': business_entity_documents,
+        'open_revision_document_ids': open_revision_document_ids,
         'comments': comments,
         'audit_logs': audit_logs,
         'comment_form': comment_form,
         'document_form': document_form,
         'participant_form': participant_form,
         'status_form': status_form,
+        'can_assign_contract_number': can_assign_contract_number,
+        'contract_number_form': contract_number_form,
+        'can_edit_structured_data': can_edit_structured_data,
+        'can_request_data_revision': can_request_data_revision,
+        'can_legal_approve': can_legal_approve,
+        'can_legal_terminate': can_legal_terminate,
+        'can_review_document_revisions': can_review_document_revisions,
         'contract_data': contract_data,
+        'structured_data_display': structured_data_display,
         'all_data_versions': all_data_versions,
-        'drafts': drafts,
+        'latest_draft': latest_draft,
         'final_approval_form': final_approval_form,
         'can_upload_final': can_upload_final,
+        'can_update_status': can_update_status,
     }
     
     return render(request, 'contracts/contract_detail.html', context)
@@ -420,9 +738,22 @@ def upload_final_document(request, pk):
         messages.error(request, 'You do not have permission to view this contract')
         return redirect('dashboard')
     
+    is_legal_final_uploader = (
+        is_legal_team_user(request.user)
+        or contract.participants.filter(
+            user=request.user,
+            role='LEGAL',
+            is_active=True,
+        ).exists()
+    )
+
     # Check permission to upload final document
-    if not has_contract_permission(request.user, contract, 'upload_final_document'):
+    if not has_contract_permission(request.user, contract, 'upload_final_document') or not is_legal_final_uploader:
         messages.error(request, 'You do not have permission to upload the final contract document')
+        return redirect('contract_detail', pk=pk)
+
+    if contract.status != ContractStatus.APPROVED:
+        messages.error(request, 'Final signed document can only be uploaded when contract status is Approved')
         return redirect('contract_detail', pk=pk)
     
     if request.method == 'POST':
@@ -439,6 +770,13 @@ def upload_final_document(request, pk):
             final_doc.contract = contract
             final_doc.uploaded_by = request.user
             final_doc.save()
+
+            previous_status = contract.status
+            status_changed = False
+            if contract.status == ContractStatus.APPROVED:
+                contract.status = ContractStatus.ACTIVE
+                contract.save(update_fields=['status'])
+                status_changed = True
             
             # Log action
             AuditLog.objects.create(
@@ -447,6 +785,35 @@ def upload_final_document(request, pk):
                 user=request.user,
                 details=f'Final contract document uploaded: {final_doc.document.name}'
             )
+
+            if status_changed:
+                AuditLog.objects.create(
+                    contract=contract,
+                    action='STATUS_CHANGE',
+                    user=request.user,
+                    old_value=previous_status,
+                    new_value=ContractStatus.ACTIVE,
+                    details='Status moved to Active after final document upload'
+                )
+
+                EmailService.send_contract_activated_email(contract)
+
+            _notify_contract_activity(
+                contract,
+                request.user,
+                'Final Document Uploaded',
+                f'Final signed document uploaded: {final_doc.document.name}',
+                event_key='activity_final_document_uploaded',
+            )
+
+            if status_changed:
+                _notify_contract_activity(
+                    contract,
+                    request.user,
+                    'Status Updated',
+                    'Status changed from Approved to Active after final document upload.',
+                    event_key='activity_status_updated',
+                )
             
             messages.success(request, 'Final contract document uploaded successfully')
             return redirect('contract_detail', pk=pk)
@@ -468,16 +835,258 @@ def contract_edit(request, pk):
         messages.error(request, 'You do not have permission to edit this contract')
         return redirect('contract_detail', pk=pk)
     
+    contract_type_code = request.POST.get('contract_type') or request.GET.get('contract_type') or contract.contract_type
+    type_def = ContractTypeDefinition.objects.filter(code=contract_type_code).order_by('-active').first()
+    field_definitions = _get_template_field_definitions(type_def) if type_def and type_def.is_template_based else None
+
+    is_gt_contract = contract_type_code in {
+        ContractType.GENERAL_TRADE,
+        ContractType.GENERAL_TRADE_PREMIUM,
+    }
+    is_distributor_contract = contract_type_code == ContractType.DISTRIBUTOR
+    gt_auto_field_keys = {
+        'party_b_name',
+        'contract_start_date',
+        'contract_end_date',
+        'business_form',
+        'quarter_1_period',
+        'quarter_2_period',
+        'quarter_3_period',
+        'quarter_4_period',
+        'total_purchase_target',
+        'sales_target_q1',
+        'sales_target_q2',
+        'sales_target_q3',
+        'sales_target_q4',
+        'cvcodenumber',
+        'cvcode_number',
+        'payment_terms',
+    }
+
+    if field_definitions and is_gt_contract:
+        field_definitions = field_definitions.exclude(field_key__in=gt_auto_field_keys)
+
+    if field_definitions and is_distributor_contract:
+        distributor_auto_field_keys = {
+            'second_party_place_name',
+            'second_party_criteria',
+        }
+        field_definitions = field_definitions.exclude(field_key__in=distributor_auto_field_keys)
+
+    def apply_gt_defaults(contract_instance, data_dict):
+        """Keep GT calculated fields consistent with contract header values."""
+        from decimal import Decimal
+        from dateutil.relativedelta import relativedelta
+
+        def add_months(start_date, n_months):
+            return start_date + relativedelta(months=n_months)
+
+        resolved_contract_number = _get_contract_number(contract_instance) or f"DRAFT-{contract_instance.id}"
+        data_dict['contract_number'] = resolved_contract_number
+        data_dict['no_contract'] = resolved_contract_number
+
+        data_dict['party_b_name'] = contract_instance.party_b or ''
+
+        business_form_map = {
+            'PT': 'Badan Hukum Perseroan Terbatas',
+            'CV': 'CV',
+            'PERORANGAN': 'Usaha Perseorangan',
+        }
+        data_dict['business_form'] = business_form_map.get(contract_instance.business_entity_type, '')
+
+        if contract_instance.start_date:
+            data_dict['contract_start_date'] = contract_instance.start_date.strftime('%Y-%m-%d')
+        else:
+            data_dict['contract_start_date'] = ''
+
+        if contract_instance.end_date:
+            data_dict['contract_end_date'] = contract_instance.end_date.strftime('%Y-%m-%d')
+        else:
+            data_dict['contract_end_date'] = ''
+
+        data_dict['total_purchase_target'] = str(contract_instance.contract_value or '')
+
+        total_target = contract_instance.contract_value
+        if total_target is not None:
+            try:
+                total_decimal = Decimal(str(total_target))
+                base_target = total_decimal // Decimal('4')
+                remainder_target = total_decimal - (base_target * 4)
+
+                data_dict['sales_target_q1'] = str(base_target)
+                data_dict['sales_target_q2'] = str(base_target)
+                data_dict['sales_target_q3'] = str(base_target)
+                data_dict['sales_target_q4'] = str(base_target + remainder_target)
+            except Exception:
+                data_dict['sales_target_q1'] = ''
+                data_dict['sales_target_q2'] = ''
+                data_dict['sales_target_q3'] = ''
+                data_dict['sales_target_q4'] = ''
+        else:
+            data_dict['sales_target_q1'] = ''
+            data_dict['sales_target_q2'] = ''
+            data_dict['sales_target_q3'] = ''
+            data_dict['sales_target_q4'] = ''
+
+        if contract_instance.start_date:
+            start_date = contract_instance.start_date
+            q1_start = start_date
+            q2_start = add_months(start_date, 3)
+            q3_start = add_months(start_date, 6)
+            q4_start = add_months(start_date, 9)
+
+            q1_end = q2_start - timedelta(days=1)
+            q2_end = q3_start - timedelta(days=1)
+            q3_end = q4_start - timedelta(days=1)
+            q4_end = contract_instance.end_date if contract_instance.end_date else add_months(start_date, 12) - timedelta(days=1)
+
+            def fmt(date_obj):
+                return date_obj.strftime('%d %b %Y')
+
+            data_dict['quarter_1_period'] = f"{fmt(q1_start)} - {fmt(q1_end)}"
+            data_dict['quarter_2_period'] = f"{fmt(q2_start)} - {fmt(q2_end)}"
+            data_dict['quarter_3_period'] = f"{fmt(q3_start)} - {fmt(q3_end)}"
+            data_dict['quarter_4_period'] = f"{fmt(q4_start)} - {fmt(q4_end)}"
+        else:
+            data_dict['quarter_1_period'] = ''
+            data_dict['quarter_2_period'] = ''
+            data_dict['quarter_3_period'] = ''
+            data_dict['quarter_4_period'] = ''
+
+        # This field is deprecated for GT and must not be user-controlled.
+        data_dict.pop('payment_terms', None)
+
+        return data_dict
+
+    def apply_distributor_defaults(contract_instance, data_dict):
+        """Keep distributor derived fields synced with contract header values."""
+        resolved_contract_number = _get_contract_number(contract_instance) or f"DRAFT-{contract_instance.id}"
+        data_dict['contract_number'] = resolved_contract_number
+        data_dict['no_contract'] = resolved_contract_number
+        data_dict['party_b_name'] = contract_instance.party_b or ''
+        data_dict['party_b_legal_name'] = contract_instance.party_b or ''
+        data_dict['second_party_place_name'] = contract_instance.party_b or ''
+        data_dict['second_party_criteria'] = contract_instance.business_entity_type or ''
+        return data_dict
+
+    latest_data = contract.structured_data_versions.first()
+    had_prior_structured_data = contract.structured_data_versions.exists()
+    initial_data = latest_data.data if latest_data and latest_data.data else {}
+
+    if is_gt_contract:
+        initial_data = apply_gt_defaults(contract, dict(initial_data))
+    elif is_distributor_contract:
+        initial_data = apply_distributor_defaults(contract, dict(initial_data))
+
     if request.method == 'POST':
-        form = ContractForm(request.POST, request.FILES, instance=contract)
-        if form.is_valid():
-            form.save()
+        form = ContractForm(
+            request.POST,
+            request.FILES,
+            instance=contract,
+            enforce_auto_period=True,
+            initial_cv_code=_extract_cv_code(contract),
+        )
+        data_form = ContractDataForm(request.POST, request.FILES, field_definitions=field_definitions) if field_definitions else None
+
+        form_valid = form.is_valid()
+        data_form_valid = (data_form is None) or data_form.is_valid()
+
+        if form_valid and data_form_valid:
+            previous_status = contract.status
+            updated_contract = form.save()
+
+            if data_form:
+                last_version = updated_contract.structured_data_versions.aggregate(v=Max('version'))['v'] or 0
+                next_version = last_version + 1
+
+                clean_data = {}
+                file_fields = []
+                for key, value in data_form.cleaned_data.items():
+                    field_def = field_definitions.filter(field_key=key).first()
+                    if field_def and field_def.field_type == 'file' and value:
+                        file_fields.append((key, value))
+                        clean_data[key] = value.name
+                    else:
+                        clean_data[key] = str(value) if value else ''
+
+                # Preserve existing values for keys not included in current edit form.
+                merged_data = dict(initial_data)
+                merged_data.update(clean_data)
+
+                if is_gt_contract:
+                    merged_data = apply_gt_defaults(updated_contract, merged_data)
+                elif is_distributor_contract:
+                    merged_data = apply_distributor_defaults(updated_contract, merged_data)
+
+                contract_data = ContractData.objects.create(
+                    contract=updated_contract,
+                    data=merged_data,
+                    version=next_version,
+                    submitted_by=request.user
+                )
+
+                # If legal previously sent this contract back to Draft for revision,
+                # move it back to Legal Review and notify reviewers after user updates.
+                if previous_status == ContractStatus.DRAFT and had_prior_structured_data:
+                    updated_contract.status = ContractStatus.LEGAL_REVIEW
+                    updated_contract.save(update_fields=['status'])
+                    EmailService.send_data_submitted_email(updated_contract, request.user)
+                    EmailService.send_legal_review_email(updated_contract)
+
+                for field_key, file_obj in file_fields:
+                    ContractDataFile.objects.create(
+                        contract_data=contract_data,
+                        field_key=field_key,
+                        file=file_obj
+                    )
+                
+                _notify_contract_activity(
+                    updated_contract,
+                    request.user,
+                    'Contract Edited',
+                    'Contract details and structured data were updated.',
+                    event_key='activity_contract_edited',
+                )
+
+                if previous_status == ContractStatus.DRAFT and had_prior_structured_data:
+                    _notify_contract_activity(
+                        updated_contract,
+                        request.user,
+                        'Revision Resubmitted',
+                        'Updated revision was resubmitted and moved back to legal review.',
+                        event_key='activity_structured_data_submitted',
+                    )
+            else:
+                _notify_contract_activity(
+                    updated_contract,
+                    request.user,
+                    'Contract Edited',
+                    'Contract details were updated.',
+                    event_key='activity_contract_edited',
+                )
+
             messages.success(request, 'Contract updated successfully')
             return redirect('contract_detail', pk=pk)
     else:
-        form = ContractForm(instance=contract)
+        form = ContractForm(
+            instance=contract,
+            enforce_auto_period=True,
+            initial_cv_code=_extract_cv_code(contract),
+        )
+        data_form = ContractDataForm(field_definitions=field_definitions, initial=initial_data) if field_definitions else None
     
-    return render(request, 'contracts/contract_form.html', {'form': form, 'action': 'Edit', 'contract': contract})
+    return render(
+        request,
+        'contracts/contract_form.html',
+        {
+            'form': form,
+            'data_form': data_form,
+            'action': 'Edit',
+            'contract': contract,
+            'contract_type_code': contract_type_code,
+            'is_gt_contract': is_gt_contract,
+        }
+    )
 
 
 @login_required
@@ -503,19 +1112,157 @@ def update_contract_status(request, pk):
     """Update contract status"""
     if request.method == 'POST':
         contract = get_object_or_404(Contract, pk=pk)
-        
-        # Check permission
+
         if not can_update_contract_status(request.user, contract):
             messages.error(request, 'You do not have permission to update this contract')
             return redirect('contract_detail', pk=pk)
+
+        new_status = request.POST.get('status')
+        if not can_transition_to_status(request.user, contract, new_status):
+            messages.error(request, 'Status transition is not allowed for your role or current workflow state')
+            return redirect('contract_detail', pk=pk)
+
+        previous_status = contract.status
+        previous_status_label = contract.get_status_display()
         
-        form = ContractStatusUpdateForm(request.POST, instance=contract)
+        form = ContractStatusUpdateForm(request.POST, instance=contract, user=request.user, contract=contract)
         if form.is_valid():
-            form.save()
+            assigned_contract_number = None
+            manual_contract_number = (form.cleaned_data.get('contract_number_override') or '').strip()
+
+            if new_status == ContractStatus.APPROVED and not _get_contract_number(contract):
+                if manual_contract_number:
+                    assigned_contract_number = manual_contract_number
+                else:
+                    try:
+                        assigned_contract_number = ContractNumberService.generate_for_contract(contract)
+                    except ValueError as error_message:
+                        messages.error(request, str(error_message))
+                        return redirect('contract_detail', pk=pk)
+
+            updated_contract = form.save(commit=False)
+            updated_contract.status = new_status
+            if assigned_contract_number:
+                _set_contract_number(updated_contract, assigned_contract_number)
+            updated_contract.save()
+
+            new_status_label = updated_contract.get_status_display()
+
+            AuditLog.objects.create(
+                contract=updated_contract,
+                action='STATUS_CHANGE',
+                user=request.user,
+                old_value=previous_status,
+                new_value=new_status,
+                details=f'Status changed from {previous_status_label} to {new_status_label}'
+            )
+
+            if new_status == ContractStatus.APPROVED:
+
+                if assigned_contract_number:
+                    assignment_source = 'manual override' if manual_contract_number else 'auto-generated'
+                    AuditLog.objects.create(
+                        contract=updated_contract,
+                        action='UPDATE',
+                        user=request.user,
+                        details=f'Contract number assigned ({assignment_source}): {assigned_contract_number}'
+                    )
+
+                if updated_contract.is_template_based:
+                    try:
+                        _generate_contract_draft(updated_contract, user=request.user, is_regeneration=True)
+                    except Exception:
+                        pass
+
+                EmailService.send_contract_approved_email(updated_contract)
+            elif new_status == ContractStatus.LEGAL_REVIEW:
+                EmailService.send_legal_review_email(updated_contract)
+            elif (
+                new_status == ContractStatus.DRAFT
+                and previous_status in [ContractStatus.SUBMITTED, ContractStatus.LEGAL_REVIEW]
+            ):
+                EmailService.send_data_revision_requested_email(
+                    updated_contract,
+                    request.user,
+                    previous_status_label=previous_status_label,
+                )
+
             messages.success(request, 'Contract status updated successfully')
+            
+            _notify_contract_activity(
+                updated_contract,
+                request.user,
+                'Status Updated',
+                f'Status changed from {previous_status_label} to {new_status_label}.',
+                event_key='activity_status_updated',
+            )
         else:
-            messages.error(request, 'Error updating contract status')
+            for field_errors in form.errors.values():
+                for error_text in field_errors:
+                    messages.error(request, str(error_text))
+
+            if not form.errors:
+                messages.error(request, 'Error updating contract status')
     
+    return redirect('contract_detail', pk=pk)
+
+
+@login_required
+def assign_contract_number(request, pk):
+    """Assign contract number manually (or auto when empty input) for legal convenience."""
+    if request.method != 'POST':
+        return redirect('contract_detail', pk=pk)
+
+    contract = get_object_or_404(Contract, pk=pk)
+
+    if not can_view_contract(request.user, contract):
+        messages.error(request, 'You do not have permission to view this contract')
+        return redirect('dashboard')
+
+    if not _can_assign_contract_number(request.user, contract):
+        messages.error(request, 'You do not have permission to assign contract number for this contract')
+        return redirect('contract_detail', pk=pk)
+
+    form = ContractNumberOverrideForm(request.POST, contract=contract)
+    if not form.is_valid():
+        for field_errors in form.errors.values():
+            for error_text in field_errors:
+                messages.error(request, str(error_text))
+        return redirect('contract_detail', pk=pk)
+
+    manual_contract_number = (form.cleaned_data.get('contract_number') or '').strip()
+
+    if manual_contract_number:
+        assigned_contract_number = manual_contract_number
+        assignment_source = 'manual override'
+    else:
+        try:
+            assigned_contract_number = ContractNumberService.generate_for_contract(contract)
+        except ValueError as error_message:
+            messages.error(request, str(error_message))
+            return redirect('contract_detail', pk=pk)
+        assignment_source = 'auto-generated'
+
+    _set_contract_number(contract, assigned_contract_number)
+    contract.save()
+
+    AuditLog.objects.create(
+        contract=contract,
+        action='UPDATE',
+        user=request.user,
+        details=f'Contract number assigned ({assignment_source}) via assign form: {assigned_contract_number}'
+    )
+
+    messages.success(request, f'Contract number assigned successfully: {assigned_contract_number}')
+    
+    _notify_contract_activity(
+        contract,
+        request.user,
+        'Contract Number Assigned',
+        f'Contract number set to {assigned_contract_number} ({assignment_source}).',
+        event_key='activity_contract_number_assigned',
+    )
+
     return redirect('contract_detail', pk=pk)
 
 
@@ -535,7 +1282,20 @@ def add_participant(request, pk):
             participant = form.save(commit=False)
             participant.contract = contract
             participant.save()
-            messages.success(request, f'Participant {participant.user.get_full_name()} added successfully')
+            participant_name = (
+                participant.user.get_full_name() if participant.user else ''
+            ) or (
+                participant.user.username if participant.user else ''
+            ) or participant.external_name or 'Participant'
+            messages.success(request, f'Participant {participant_name} added successfully')
+
+            _notify_contract_activity(
+                contract,
+                request.user,
+                'Participant Added',
+                f'{participant_name} added as {participant.get_role_display()}.',
+                event_key='activity_participant_added',
+            )
         else:
             messages.error(request, 'Error adding participant')
     
@@ -550,6 +1310,7 @@ def add_document(request, pk):
         
         if not can_add_document(request.user, contract):
             messages.error(request, 'You do not have permission to add documents')
+
             return redirect('contract_detail', pk=pk)
 
         form = ContractDocumentForm(request.POST, request.FILES)
@@ -572,10 +1333,19 @@ def add_document(request, pk):
             )
             if contract.contract_type in {ContractType.VENDOR, ContractType.PURCHASE}:
                 if contract.status == ContractStatus.DRAFT:
-                    contract.status = ContractStatus.SUBMITTED
+                    contract.status = ContractStatus.LEGAL_REVIEW
                     contract.save(update_fields=['status'])
+                    EmailService.send_legal_review_email(contract)
             
             messages.success(request, 'Document added successfully')
+            
+            _notify_contract_activity(
+                contract,
+                request.user,
+                'Document Uploaded',
+                f'Document "{document.title}" uploaded.',
+                event_key='activity_document_uploaded',
+            )
         else:
             messages.error(request, 'Error adding document')
     
@@ -624,7 +1394,9 @@ def _generate_contract_draft(contract, user=None, is_regeneration=False):
     context_data = TemplateService.build_template_context(contract, contract_data.data)
 
     rendered_html = Template(template.content).render(Context(context_data))
-    file_name = f"contract_{slugify(contract.title)}_draft_v{version}.html"
+    gt_variant = _gt_variant_suffix(contract.contract_type)
+    variant_segment = f"_{gt_variant}" if gt_variant else ""
+    file_name = f"contract_{slugify(contract.title)}{variant_segment}_draft_v{version}.html"
 
     draft = ContractDraft(contract=contract, template=template, version=version)
     draft.file.save(file_name, ContentFile(rendered_html.encode('utf-8')), save=False)
@@ -656,13 +1428,85 @@ def contract_data_input(request, pk):
         messages.error(request, 'No contract type definition found for this contract')
         return redirect('contract_detail', pk=pk)
 
-    field_definitions = type_def.fields.all().order_by('position', 'label')
+    field_definitions = _get_template_field_definitions(type_def)
     if not field_definitions:
         if request.user.is_staff:
             messages.warning(request, f'No fields configured for {contract.get_contract_type_display()}. Please add fields in the admin panel first.')
         else:
             messages.error(request, 'This contract type is not yet configured. Please contact an administrator.')
         return redirect('contract_detail', pk=pk)
+
+    is_gt_contract = contract.contract_type in {ContractType.GENERAL_TRADE, ContractType.GENERAL_TRADE_PREMIUM}
+
+    def _add_months(date_obj, months):
+        month = date_obj.month - 1 + months
+        year = date_obj.year + month // 12
+        month = month % 12 + 1
+        day = min(date_obj.day, [31,
+                                 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+                                 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+        return date_obj.replace(year=year, month=month, day=day)
+
+    def _decimal_to_string(value):
+        if value == value.to_integral_value():
+            return str(int(value))
+        return format(value.normalize(), 'f')
+
+    def _apply_gt_auto_fields(data_dict):
+        """Keep derived GT fields synchronized during structured-data edits."""
+        from datetime import datetime
+        from decimal import Decimal
+        import re
+
+        start_date = None
+        start_value = str(data_dict.get('contract_start_date') or '').strip()
+        if start_value:
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+                try:
+                    start_date = datetime.strptime(start_value, fmt).date()
+                    break
+                except ValueError:
+                    continue
+
+        if start_date:
+            end_date = _add_months(start_date, 12) - timedelta(days=1)
+            data_dict['contract_end_date'] = end_date.strftime('%Y-%m-%d')
+
+            q1_start = start_date
+            q2_start = _add_months(start_date, 3)
+            q3_start = _add_months(start_date, 6)
+            q4_start = _add_months(start_date, 9)
+
+            q1_end = q2_start - timedelta(days=1)
+            q2_end = q3_start - timedelta(days=1)
+            q3_end = q4_start - timedelta(days=1)
+            q4_end = end_date
+
+            def fmt(date_obj):
+                return date_obj.strftime('%d %b %Y')
+
+            data_dict['quarter_1_period'] = f"{fmt(q1_start)} - {fmt(q1_end)}"
+            data_dict['quarter_2_period'] = f"{fmt(q2_start)} - {fmt(q2_end)}"
+            data_dict['quarter_3_period'] = f"{fmt(q3_start)} - {fmt(q3_end)}"
+            data_dict['quarter_4_period'] = f"{fmt(q4_start)} - {fmt(q4_end)}"
+
+        total_target_raw = str(data_dict.get('total_purchase_target') or '').strip()
+        if total_target_raw:
+            numeric_value = re.sub(r'[^0-9.]', '', total_target_raw)
+            if numeric_value:
+                try:
+                    total_decimal = Decimal(numeric_value)
+                    base_target = total_decimal // Decimal('4')
+                    remainder_target = total_decimal - (base_target * 4)
+
+                    data_dict['sales_target_q1'] = _decimal_to_string(base_target)
+                    data_dict['sales_target_q2'] = _decimal_to_string(base_target)
+                    data_dict['sales_target_q3'] = _decimal_to_string(base_target)
+                    data_dict['sales_target_q4'] = _decimal_to_string(base_target + remainder_target)
+                except Exception:
+                    pass
+
+        return data_dict
 
     initial_data = {}
     latest_data = contract.structured_data_versions.first()
@@ -687,6 +1531,9 @@ def contract_data_input(request, pk):
             'quarter_4_period': '',
         }
 
+    if is_gt_contract:
+        initial_data = _apply_gt_auto_fields(dict(initial_data))
+
     if request.method == 'POST':
         form = ContractDataForm(request.POST, request.FILES, field_definitions=field_definitions)
         if form.is_valid():
@@ -704,6 +1551,9 @@ def contract_data_input(request, pk):
                     clean_data[key] = value.name  # Store filename in JSON
                 else:
                     clean_data[key] = str(value) if value else ''
+
+            if is_gt_contract:
+                clean_data = _apply_gt_auto_fields(clean_data)
             
             # Create new data version
             contract_data = ContractData.objects.create(
@@ -730,7 +1580,7 @@ def contract_data_input(request, pk):
                 )
 
             if contract.status == ContractStatus.DRAFT:
-                contract.status = ContractStatus.SUBMITTED
+                contract.status = ContractStatus.LEGAL_REVIEW
                 contract.save(update_fields=['status'])
 
             AuditLog.objects.create(
@@ -741,6 +1591,15 @@ def contract_data_input(request, pk):
             )
 
             EmailService.send_data_submitted_email(contract, request.user)
+            EmailService.send_legal_review_email(contract)
+
+            _notify_contract_activity(
+                contract,
+                request.user,
+                'Structured Data Submitted',
+                'Structured data was submitted for legal review.',
+                event_key='activity_structured_data_submitted',
+            )
 
             draft = _generate_contract_draft(contract, user=request.user)
             if draft:
@@ -758,6 +1617,120 @@ def contract_data_input(request, pk):
         'field_definitions': field_definitions,
     }
     return render(request, 'contracts/contract_data_form.html', context)
+
+
+@login_required
+def review_structured_data(request, pk, decision):
+    """Legal review action for structured data (approve or reject)."""
+    if request.method != 'POST':
+        return redirect('contract_detail', pk=pk)
+
+    contract = get_object_or_404(Contract, pk=pk)
+
+    if not can_update_contract_status(request.user, contract):
+        messages.error(request, 'You do not have permission to review structured data')
+        return redirect('contract_detail', pk=pk)
+
+    if decision not in {'approve', 'reject'}:
+        messages.error(request, 'Invalid structured data review action')
+        return redirect('contract_detail', pk=pk)
+
+    latest_data = contract.structured_data_versions.first()
+    if not latest_data:
+        messages.error(request, 'No structured data available to review')
+        return redirect('contract_detail', pk=pk)
+
+    previous_status = contract.status
+    previous_status_label = contract.get_status_display()
+
+    if decision == 'approve':
+        target_status = ContractStatus.APPROVED
+        review_reason = ''
+    else:
+        target_status = ContractStatus.DRAFT
+        review_reason = (request.POST.get('reason') or '').strip()
+        if not review_reason:
+            messages.error(request, 'Please provide rejection reason for data revision request')
+            return redirect('contract_detail', pk=pk)
+
+    if not can_transition_to_status(request.user, contract, target_status):
+        messages.error(request, 'This review transition is not allowed for your role or current workflow state')
+        return redirect('contract_detail', pk=pk)
+
+    assigned_contract_number = None
+    if target_status == ContractStatus.APPROVED and not _get_contract_number(contract):
+        try:
+            assigned_contract_number = ContractNumberService.generate_for_contract(contract)
+        except ValueError as error_message:
+            messages.error(request, str(error_message))
+            return redirect('contract_detail', pk=pk)
+
+    contract.status = target_status
+    if assigned_contract_number:
+        _set_contract_number(contract, assigned_contract_number)
+    contract.save()
+
+    target_status_label = contract.get_status_display()
+    action_details = f'Structured data {decision}ed: status changed from {previous_status_label} to {target_status_label}'
+    if review_reason:
+        action_details = f'{action_details}. Reason: {review_reason}'
+
+    AuditLog.objects.create(
+        contract=contract,
+        action='STATUS_CHANGE',
+        user=request.user,
+        old_value=previous_status,
+        new_value=target_status,
+        details=action_details
+    )
+
+    if decision == 'approve':
+        if assigned_contract_number:
+            AuditLog.objects.create(
+                contract=contract,
+                action='UPDATE',
+                user=request.user,
+                details=f'Contract number assigned (auto-generated): {assigned_contract_number}'
+            )
+
+        if contract.is_template_based:
+            try:
+                _generate_contract_draft(contract, user=request.user, is_regeneration=True)
+            except Exception:
+                pass
+
+        messages.success(request, 'Structured data approved successfully')
+        _notify_contract_activity(
+            contract,
+            request.user,
+            'Structured Data Approved',
+            'Structured data approved and contract moved forward.',
+            event_key='activity_structured_data_approved',
+        )
+    else:
+        Comment.objects.create(
+            contract=contract,
+            user=request.user,
+            text=f'Structured data revision requested: {review_reason}',
+            is_internal=True,
+        )
+
+        EmailService.send_data_revision_requested_email(
+            contract,
+            request.user,
+            previous_status_label=previous_status_label,
+        )
+
+        messages.success(request, 'Structured data rejected and returned for revision')
+        _notify_contract_activity(
+            contract,
+            request.user,
+            'Structured Data Rejected',
+            f'Structured data returned for revision. Reason: {review_reason}',
+            event_key='activity_structured_data_rejected',
+        )
+
+    return redirect('contract_detail', pk=pk)
 
 
 @login_required
@@ -818,3 +1791,1017 @@ def terminated_contracts(request):
     ).distinct().order_by('-updated_at')
     
     return render(request, 'contracts/terminated_contracts.html', {'contracts': contracts})
+
+
+# ===== Contract Creation Wizard =====
+
+@login_required
+def contract_wizard_step1(request):
+    """
+    Step 1: Select Business Entity Type
+    Users choose between PT, CV, or Perorangan
+    """
+    from .forms import BusinessEntityTypeForm
+    
+    if request.method == 'POST':
+        form = BusinessEntityTypeForm(request.POST)
+        if form.is_valid():
+            # Store entity type in session
+            request.session['wizard_entity_type'] = form.cleaned_data['business_entity_type']
+            return redirect('contract_wizard_step2')
+    else:
+        form = BusinessEntityTypeForm()
+    
+    return render(request, 'contracts/wizard_step1_entity_type.html', {'form': form, 'step': 1})
+
+
+@login_required
+def contract_wizard_step2(request):
+    """
+    Step 2: Upload Required Documents
+    Based on entity type selected in step 1
+    """
+    from .forms import BusinessEntityDocumentForm
+    from .models import BusinessEntityDocument, BusinessDocumentType
+    
+    # Check if step 1 completed
+    entity_type = request.session.get('wizard_entity_type')
+    if not entity_type:
+        messages.warning(request, 'Please select business entity type first')
+        return redirect('contract_wizard_step1')
+    
+    if request.method == 'POST':
+        form = BusinessEntityDocumentForm(request.POST, request.FILES, entity_type=entity_type)
+        if form.is_valid():
+            # Get company profile for Party A
+            from .models import CompanyProfile
+            company = CompanyProfile.get_active()
+            
+            # Create a temporary contract record to attach documents
+            contract = Contract.objects.create(
+                title='Draft Contract - Pending',
+                contract_type=ContractType.OTHER,
+                party_a=company.name if company else 'PT. Your Company Name',
+                party_b='To be specified',
+                created_by=request.user,
+                owner=request.user,
+                business_entity_type=entity_type,
+                status=ContractStatus.DRAFT
+            )
+            
+            # Save uploaded documents
+            from .models import BusinessDocumentType
+            doc_mapping = {
+                'akta_pendirian': BusinessDocumentType.AKTA_PENDIRIAN,
+                'npwp': BusinessDocumentType.NPWP,
+                'nib': BusinessDocumentType.NIB,
+                'ktp_penanggung_jawab': BusinessDocumentType.KTP_PENANGGUNG_JAWAB,
+                'perizinan_lainnya': BusinessDocumentType.PERIZINAN_LAINNYA,
+                'ktp': BusinessDocumentType.KTP,
+            }
+            
+            for field_name, doc_type in doc_mapping.items():
+                if field_name in form.cleaned_data and form.cleaned_data[field_name]:
+                    BusinessEntityDocument.objects.create(
+                        contract=contract,
+                        document_type=doc_type,
+                        document=form.cleaned_data[field_name],
+                        uploaded_by=request.user
+                    )
+            
+            # Store contract ID in session for step 3
+            request.session['wizard_contract_id'] = contract.id
+            messages.success(request, 'Documents uploaded successfully. Now fill in contract details.')
+            return redirect('contract_wizard_step3')
+    else:
+        form = BusinessEntityDocumentForm(entity_type=entity_type)
+    
+    # Get display name for entity type
+    from .models import BusinessEntityType
+    entity_display = dict(BusinessEntityType.choices).get(entity_type, entity_type)
+    
+    context = {
+        'form': form,
+        'entity_type': entity_type,
+        'entity_display': entity_display,
+        'step': 2
+    }
+    
+    return render(request, 'contracts/wizard_step2_documents.html', context)
+
+
+@login_required
+def contract_wizard_step3(request):
+    """
+    Step 3: Fill Basic Contract Information
+    Reuses existing contract form but updates the draft contract from step 2
+    """
+    # Check if previous steps completed
+    contract_id = request.session.get('wizard_contract_id')
+    if not contract_id:
+        messages.warning(request, 'Please complete document upload first')
+        return redirect('contract_wizard_step2')
+    
+    contract = get_object_or_404(Contract, id=contract_id, created_by=request.user)
+
+    contract_type_code = request.POST.get('contract_type') or request.GET.get('contract_type') or contract.contract_type
+
+    if request.method == 'POST':
+        form = ContractForm(
+            request.POST,
+            request.FILES,
+            instance=contract,
+            enforce_auto_period=True,
+            initial_cv_code=request.session.get('wizard_cv_code', ''),
+        )
+
+        if form.is_valid():
+            contract = form.save(commit=False)
+            # Party A should already be set from step 2, keep owner/creator
+            contract.save()
+
+            request.session['wizard_cv_code'] = (form.cleaned_data.get('cv_code') or '').strip()
+
+            additional_docs = request.FILES.getlist('additional_documents')
+            additional_titles = request.POST.getlist('additional_document_titles')
+            if additional_docs:
+                for idx, doc in enumerate(additional_docs):
+                    title = ''
+                    if idx < len(additional_titles):
+                        title = additional_titles[idx].strip()
+                    if not title:
+                        title = doc.name
+                    ContractDocument.objects.create(
+                        contract=contract,
+                        title=title,
+                        document=doc,
+                        uploaded_by=request.user
+                    )
+
+                AuditLog.objects.create(
+                    contract=contract,
+                    user=request.user,
+                    action='DOCUMENT_UPLOAD',
+                    details='Additional documents uploaded during creation'
+                )
+
+            # Move to step 4 for structured data
+            return redirect('contract_wizard_step4')
+        else:
+            return render(
+                request,
+                'contracts/wizard_step3_contract_info.html',
+                {
+                    'form': form,
+                    'action': 'Create',
+                    'contract_type_code': contract_type_code,
+                    'step': 3
+                }
+            )
+
+    form = ContractForm(
+        instance=contract,
+        initial={'contract_type': contract_type_code},
+        enforce_auto_period=True,
+        initial_cv_code=request.session.get('wizard_cv_code', ''),
+    )
+
+    context = {
+        'form': form,
+        'action': 'Create',
+        'contract_type_code': contract_type_code,
+        'step': 3
+    }
+
+    return render(request, 'contracts/wizard_step3_contract_info.html', context)
+
+
+@login_required
+def contract_wizard_step4(request):
+    """
+    Step 4: Fill Structured Data (Required)
+    This step handles the contract-specific structured data fields
+    """
+    # Check if previous steps completed
+    contract_id = request.session.get('wizard_contract_id')
+    if not contract_id:
+        messages.warning(request, 'Please complete contract information first')
+        return redirect('contract_wizard_step3')
+    
+    contract = get_object_or_404(Contract, id=contract_id, created_by=request.user)
+    
+    def get_field_definitions(contract_type_code):
+        type_def = ContractTypeDefinition.objects.filter(
+            code=contract_type_code,
+            active=True
+        ).first()
+        if not type_def or not type_def.is_template_based:
+            return None
+        return _get_template_field_definitions(type_def)
+
+    def apply_gt_defaults(contract_instance, data_dict):
+        """Auto-populate GT-specific fields from contract metadata"""
+        from decimal import Decimal
+        from datetime import datetime, timedelta
+        from dateutil.relativedelta import relativedelta
+
+        resolved_contract_number = _get_contract_number(contract_instance) or f"DRAFT-{contract_instance.id}"
+        data_dict['contract_number'] = resolved_contract_number
+        data_dict['no_contract'] = resolved_contract_number
+
+        def add_months(start_date, n_months):
+            return start_date + relativedelta(months=n_months)
+
+        def format_currency_idr(value):
+            """Format currency in Indonesian Rupiah style"""
+            try:
+                if isinstance(value, str):
+                    value = value.replace('.', '').replace(',', '')
+                value = float(value)
+                return f"Rp {value:,.0f}".replace(',', '.')
+            except (ValueError, TypeError):
+                return "Rp 0"
+
+        if not data_dict.get('party_a_name'):
+            data_dict['party_a_name'] = contract_instance.party_a
+        if not data_dict.get('party_b_name'):
+            data_dict['party_b_name'] = contract_instance.party_b
+        if not data_dict.get('party_b_legal_name'):
+            data_dict['party_b_legal_name'] = contract_instance.party_b
+
+        # Distributor-specific auto-population to avoid duplicate user input in wizard Step 4.
+        if contract_instance.contract_type == ContractType.DISTRIBUTOR:
+            if not data_dict.get('second_party_place_name'):
+                data_dict['second_party_place_name'] = contract_instance.party_b
+            if not data_dict.get('second_party_criteria') and contract_instance.business_entity_type:
+                data_dict['second_party_criteria'] = contract_instance.business_entity_type
+
+        wizard_cv_code = (request.session.get('wizard_cv_code') or '').strip()
+        if wizard_cv_code:
+            if not data_dict.get('cvcodenumber'):
+                data_dict['cvcodenumber'] = wizard_cv_code
+            if not data_dict.get('cvcode_number'):
+                data_dict['cvcode_number'] = wizard_cv_code
+
+        if contract_instance.start_date and not data_dict.get('contract_start_date'):
+            data_dict['contract_start_date'] = contract_instance.start_date.strftime('%Y-%m-%d')
+
+        if contract_instance.end_date and not data_dict.get('contract_end_date'):
+            data_dict['contract_end_date'] = contract_instance.end_date.strftime('%Y-%m-%d')
+
+        if not data_dict.get('business_form'):
+            business_form_map = {
+                'PT': 'Badan Hukum Perseroan Terbatas',
+                'CV': 'CV',
+                'PERORANGAN': 'Usaha Perseorangan',
+            }
+            data_dict['business_form'] = business_form_map.get(
+                contract_instance.business_entity_type,
+                data_dict.get('business_form', '')
+            )
+
+        if contract_instance.contract_value and not data_dict.get('total_purchase_target'):
+            data_dict['total_purchase_target'] = str(contract_instance.contract_value)
+
+        total_target = data_dict.get('total_purchase_target')
+        if total_target:
+            try:
+                total_decimal = Decimal(str(total_target))
+                base_target = total_decimal // Decimal('4')
+                remainder_target = total_decimal - (base_target * 4)
+
+                if not data_dict.get('sales_target_q1'):
+                    data_dict['sales_target_q1'] = str(base_target)
+                if not data_dict.get('sales_target_q2'):
+                    data_dict['sales_target_q2'] = str(base_target)
+                if not data_dict.get('sales_target_q3'):
+                    data_dict['sales_target_q3'] = str(base_target)
+                if not data_dict.get('sales_target_q4'):
+                    data_dict['sales_target_q4'] = str(base_target + remainder_target)
+            except Exception:
+                pass
+
+        if contract_instance.contract_value and not data_dict.get('target_value'):
+            data_dict['target_value'] = format_currency_idr(contract_instance.contract_value)
+
+        if contract_instance.start_date:
+            start_date = contract_instance.start_date
+            if not data_dict.get('effective_date'):
+                data_dict['effective_date'] = start_date.strftime('%d %B %Y')
+
+            if not data_dict.get('contract_year'):
+                data_dict['contract_year'] = start_date.strftime('%Y')
+
+            q1_start = start_date
+            q2_start = add_months(start_date, 3)
+            q3_start = add_months(start_date, 6)
+            q4_start = add_months(start_date, 9)
+
+            q1_end = q2_start - timedelta(days=1)
+            q2_end = q3_start - timedelta(days=1)
+            q3_end = q4_start - timedelta(days=1)
+            q4_end = contract_instance.end_date if contract_instance.end_date else add_months(start_date, 12) - timedelta(days=1)
+
+            def fmt(date_obj):
+                return date_obj.strftime('%d %b %Y')
+
+            if not data_dict.get('quarter_1_period'):
+                data_dict['quarter_1_period'] = f"{fmt(q1_start)} - {fmt(q1_end)}"
+            if not data_dict.get('quarter_2_period'):
+                data_dict['quarter_2_period'] = f"{fmt(q2_start)} - {fmt(q2_end)}"
+            if not data_dict.get('quarter_3_period'):
+                data_dict['quarter_3_period'] = f"{fmt(q3_start)} - {fmt(q3_end)}"
+            if not data_dict.get('quarter_4_period'):
+                data_dict['quarter_4_period'] = f"{fmt(q4_start)} - {fmt(q4_end)}"
+
+        return data_dict
+
+    contract_type_code = contract.contract_type
+    field_definitions = get_field_definitions(contract_type_code)
+
+    if field_definitions and contract_type_code in {
+        ContractType.GENERAL_TRADE,
+        ContractType.GENERAL_TRADE_PREMIUM,
+    }:
+        # Wizard step 4 for GT contracts captures user-entered fields that
+        # cannot be auto-populated from contract metadata.
+        gt_manual_input_keys = {
+            'cvcode_number',
+            'cvcodenumber',
+            'party_b_representative',
+            'party_b_representative_name',
+            'party_b_representative_title',
+            'party_b_address',
+            'delivery_address',
+            'payment_terms',
+        }
+        field_definitions = field_definitions.filter(field_key__in=gt_manual_input_keys)
+
+    if field_definitions and contract_type_code == ContractType.DISTRIBUTOR:
+        # Auto-filled from prior steps (company legal name and entity type selection)
+        # so users don't need to re-enter them in Step 4.
+        distributor_auto_keys = {
+            'second_party_place_name',
+            'second_party_criteria',
+        }
+        field_definitions = field_definitions.exclude(field_key__in=distributor_auto_keys)
+
+    distributor_relaxed_required_keys = {
+        'second_party_place_address',
+        'total_target_qtr',
+        'quarter_1_period',
+        'sales_target_q1',
+        'quarter_2_period',
+        'sales_target_q2',
+        'quarter_3_period',
+        'sales_target_q3',
+        'quarter_4_period',
+        'sales_target_q4',
+    }
+
+    def _relax_distributor_required_fields(form):
+        if contract_type_code != ContractType.DISTRIBUTOR or not form:
+            return form
+        for key in distributor_relaxed_required_keys:
+            if key in form.fields:
+                form.fields[key].required = False
+        return form
+
+    initial_data = apply_gt_defaults(contract, {})
+
+    # Build auto-filled summary for UX display
+    is_gt_contract = contract_type_code in {ContractType.GENERAL_TRADE, ContractType.GENERAL_TRADE_PREMIUM}
+    auto_filled_summary = []
+    if is_gt_contract:
+        AUTO_FILL_LABELS = [
+            ('party_b_name', 'Company Name (Party B)'),
+            ('business_form', 'Business Form'),
+            ('contract_start_date', 'Contract Start Date'),
+            ('contract_end_date', 'Contract End Date'),
+            ('total_purchase_target', 'Total Purchase Target (IDR)'),
+            ('sales_target_q1', 'Sales Target Q1 (IDR)'),
+            ('sales_target_q2', 'Sales Target Q2 (IDR)'),
+            ('sales_target_q3', 'Sales Target Q3 (IDR)'),
+            ('sales_target_q4', 'Sales Target Q4 (IDR)'),
+            ('quarter_1_period', 'Quarter 1 Period'),
+            ('quarter_2_period', 'Quarter 2 Period'),
+            ('quarter_3_period', 'Quarter 3 Period'),
+            ('quarter_4_period', 'Quarter 4 Period'),
+        ]
+        for key, label in AUTO_FILL_LABELS:
+            if initial_data.get(key):
+                auto_filled_summary.append({'label': label, 'value': initial_data[key], 'key': key})
+
+    # If no structured data fields defined, skip this step
+    if not field_definitions:
+        # Clear wizard session data
+        request.session.pop('wizard_entity_type', None)
+        request.session.pop('wizard_contract_id', None)
+        messages.success(request, f'Contract "{contract.title}" created successfully!')
+        return redirect('contract_detail', pk=contract.pk)
+
+    if request.method == 'POST':
+        post_data = request.POST.copy()
+        raw_schema = (post_data.get('target_schema') or '').strip().lower()
+        schema_aliases = {
+            'quaterly': 'quarterly',
+            'quarter': 'quarterly',
+            'annual': 'yearly_only',
+            'yearly': 'yearly_only',
+        }
+        if raw_schema in schema_aliases:
+            post_data['target_schema'] = schema_aliases[raw_schema]
+
+        if contract_type_code == ContractType.DISTRIBUTOR:
+            # Fill common address defaults to avoid blocking on required-but-empty inputs.
+            registered_address = (post_data.get('party_b_registered_address') or '').strip()
+            second_place_address = (post_data.get('second_party_place_address') or '').strip()
+            delivery_address = (post_data.get('delivery_address') or '').strip()
+
+            if not second_place_address and registered_address:
+                post_data['second_party_place_address'] = registered_address
+                second_place_address = registered_address
+
+            if not delivery_address:
+                post_data['delivery_address'] = second_place_address or registered_address
+
+            # For quarterly/custom period schema, fill quarter periods and targets when omitted.
+            normalized_schema = (post_data.get('target_schema') or '').strip().lower()
+            should_fill_quarters = normalized_schema in {'quarterly', 'custom_period'}
+            total_target_str = (post_data.get('total_purchase_target') or '').strip()
+
+            if should_fill_quarters and total_target_str:
+                from decimal import Decimal
+                try:
+                    total_decimal = Decimal(str(total_target_str).replace(',', '').strip())
+                    base_target = total_decimal // Decimal('4')
+                    remainder_target = total_decimal - (base_target * 4)
+
+                    if not (post_data.get('sales_target_q1') or '').strip():
+                        post_data['sales_target_q1'] = str(base_target)
+                    if not (post_data.get('sales_target_q2') or '').strip():
+                        post_data['sales_target_q2'] = str(base_target)
+                    if not (post_data.get('sales_target_q3') or '').strip():
+                        post_data['sales_target_q3'] = str(base_target)
+                    if not (post_data.get('sales_target_q4') or '').strip():
+                        post_data['sales_target_q4'] = str(base_target + remainder_target)
+                except Exception:
+                    pass
+
+            if should_fill_quarters and contract.start_date:
+                from datetime import timedelta
+                from dateutil.relativedelta import relativedelta
+
+                def add_months(start_date, n_months):
+                    return start_date + relativedelta(months=n_months)
+
+                q1_start = contract.start_date
+                q2_start = add_months(contract.start_date, 3)
+                q3_start = add_months(contract.start_date, 6)
+                q4_start = add_months(contract.start_date, 9)
+
+                q1_end = q2_start - timedelta(days=1)
+                q2_end = q3_start - timedelta(days=1)
+                q3_end = q4_start - timedelta(days=1)
+                q4_end = contract.end_date if contract.end_date else add_months(contract.start_date, 12) - timedelta(days=1)
+
+                def fmt(date_obj):
+                    return date_obj.strftime('%d %b %Y')
+
+                if not (post_data.get('quarter_1_period') or '').strip():
+                    post_data['quarter_1_period'] = f"{fmt(q1_start)} - {fmt(q1_end)}"
+                if not (post_data.get('quarter_2_period') or '').strip():
+                    post_data['quarter_2_period'] = f"{fmt(q2_start)} - {fmt(q2_end)}"
+                if not (post_data.get('quarter_3_period') or '').strip():
+                    post_data['quarter_3_period'] = f"{fmt(q3_start)} - {fmt(q3_end)}"
+                if not (post_data.get('quarter_4_period') or '').strip():
+                    post_data['quarter_4_period'] = f"{fmt(q4_start)} - {fmt(q4_end)}"
+
+        data_form = ContractDataForm(post_data, request.FILES, field_definitions=field_definitions)
+        data_form = _relax_distributor_required_fields(data_form)
+
+        if contract_type_code == ContractType.DISTRIBUTOR:
+            clean_data = {
+                key: str(post_data.get(key) or '').strip()
+                for key in data_form.fields.keys()
+            }
+            auto_data = apply_gt_defaults(contract, clean_data)
+
+            from django.db.models import Max as _Max
+            last_ver = contract.structured_data_versions.aggregate(v=_Max('version'))['v'] or 0
+            ContractData.objects.update_or_create(
+                contract=contract,
+                version=max(last_ver, 1),
+                defaults={
+                    'data': auto_data,
+                    'submitted_by': request.user,
+                }
+            )
+
+            if contract.status == ContractStatus.DRAFT:
+                contract.status = ContractStatus.LEGAL_REVIEW
+                contract.save(update_fields=['status'])
+
+            AuditLog.objects.create(
+                contract=contract,
+                user=request.user,
+                action='LEGAL_REVIEW_REQUESTED',
+                details='Contract submitted to legal team for review'
+            )
+
+            try:
+                _generate_contract_draft(contract, user=request.user)
+            except Exception as draft_err:
+                import logging
+                logging.getLogger(__name__).warning('Draft generation failed for contract %s: %s', contract.pk, draft_err)
+
+            # Clear wizard session data
+            request.session.pop('wizard_entity_type', None)
+            request.session.pop('wizard_contract_id', None)
+
+            messages.success(request, f'Contract "{contract.title}" created successfully!')
+            
+            _notify_contract_activity(
+                contract,
+                request.user,
+                'Contract Submitted',
+                'Contract completed through wizard and submitted to legal review.',
+                event_key='activity_contract_submitted',
+            )
+
+            return redirect('contract_detail', pk=contract.pk)
+
+        if data_form.is_valid():
+            clean_data = {k: str(v) if v else '' for k, v in data_form.cleaned_data.items()}
+            auto_data = apply_gt_defaults(contract, clean_data)
+
+            from django.db.models import Max as _Max
+            last_ver = contract.structured_data_versions.aggregate(v=_Max('version'))['v'] or 0
+            ContractData.objects.update_or_create(
+                contract=contract,
+                version=max(last_ver, 1),
+                defaults={
+                    'data': auto_data,
+                    'submitted_by': request.user,
+                }
+            )
+
+            if contract.status == ContractStatus.DRAFT:
+                contract.status = ContractStatus.LEGAL_REVIEW
+                contract.save(update_fields=['status'])
+
+            AuditLog.objects.create(
+                contract=contract,
+                user=request.user,
+                action='LEGAL_REVIEW_REQUESTED',
+                details='Contract submitted to legal team for review'
+            )
+
+            try:
+                _generate_contract_draft(contract, user=request.user)
+            except Exception as draft_err:
+                import logging
+                logging.getLogger(__name__).warning('Draft generation failed for contract %s: %s', contract.pk, draft_err)
+
+            # Clear wizard session data
+            request.session.pop('wizard_entity_type', None)
+            request.session.pop('wizard_contract_id', None)
+
+            messages.success(request, f'Contract "{contract.title}" created successfully!')
+
+            _notify_contract_activity(
+                contract,
+                request.user,
+                'Contract Submitted',
+                'Contract completed through wizard and submitted to legal review.',
+                event_key='activity_contract_submitted',
+            )
+
+            return redirect('contract_detail', pk=contract.pk)
+        else:
+            messages.error(request, 'Please complete required fields in Step 4 before creating the contract.')
+    else:
+        data_form = ContractDataForm(field_definitions=field_definitions, initial=initial_data)
+        data_form = _relax_distributor_required_fields(data_form)
+    
+    context = {
+        'contract': contract,
+        'data_form': data_form,
+        'initial_data': initial_data,
+        'auto_filled_summary': auto_filled_summary,
+        'is_gt_contract': is_gt_contract,
+        'step': 4
+    }
+
+    return render(request, 'contracts/wizard_step4_structured_data.html', context)
+
+
+@login_required
+def contract_wizard_cancel(request):
+    """Cancel wizard and clean up"""
+    # Delete draft contract if exists
+    contract_id = request.session.get('wizard_contract_id')
+    if contract_id:
+        try:
+            contract = Contract.objects.get(id=contract_id, created_by=request.user, status=ContractStatus.DRAFT)
+            contract.delete()
+        except Contract.DoesNotExist:
+            pass
+    
+    # Clear session
+    request.session.pop('wizard_entity_type', None)
+    request.session.pop('wizard_contract_id', None)
+    request.session.pop('wizard_cv_code', None)
+    
+    messages.info(request, 'Contract creation cancelled')
+    return redirect('dashboard')
+
+
+# ===== Company Settings =====
+
+@login_required
+@require_global_permission(
+    GlobalPermission.MANAGE_COMPANY_SETTINGS,
+    error_message='You do not have permission to access company settings',
+)
+def company_settings(request):
+    """
+    Manage company profile (Party A information)
+    Only accessible to admin/staff users
+    """
+    from .models import CompanyProfile
+    company = CompanyProfile.get_active()
+    
+    # If no company profile exists, create one
+    if not company:
+        company = CompanyProfile.objects.create(
+            name='Your Company Name',
+            business_entity_type='PT',
+            is_active=True,
+            updated_by=request.user
+        )
+    
+    if request.method == 'POST':
+        company.name = request.POST.get('name', company.name)
+        company.short_name = request.POST.get('short_name', '')
+        company.business_entity_type = request.POST.get('business_entity_type', company.business_entity_type)
+        company.address = request.POST.get('address', '')
+        company.phone = request.POST.get('phone', '')
+        company.email = request.POST.get('email', '')
+        company.website = request.POST.get('website', '')
+        company.npwp = request.POST.get('npwp', '')
+        company.nib = request.POST.get('nib', '')
+        company.akta_pendirian_number = request.POST.get('akta_pendirian_number', '')
+        company.legal_representative_name = request.POST.get('legal_representative_name', '')
+        company.legal_representative_title = request.POST.get('legal_representative_title', '')
+        company.updated_by = request.user
+        
+        company.save()
+        messages.success(request, 'Company profile updated successfully')
+        return redirect('company_settings')
+    
+    from .models import BusinessEntityType
+    entity_choices = BusinessEntityType.choices
+    
+    context = {
+        'company': company,
+        'entity_choices': entity_choices,
+    }
+    
+    return render(request, 'contracts/company_settings.html', context)
+
+
+@login_required
+@require_global_permission(
+    GlobalPermission.VIEW_PERMISSION_MATRIX,
+    error_message='You do not have permission to view permissions',
+)
+def permission_matrix(request):
+    """
+    Display role-permission matrix for staff users
+    Shows which roles have which permissions in an easy-to-read table
+    """
+    from .models import ContractRolePermission, ParticipantRole, ContractPermission
+    from collections import defaultdict
+    
+    # Get all permissions from database or use defaults
+    db_permissions = ContractRolePermission.objects.all()
+    
+    # Build permission matrix
+    matrix = defaultdict(dict)
+    
+    if db_permissions.exists():
+        # Use database values
+        for perm in db_permissions:
+            matrix[perm.permission][perm.role] = perm.allowed
+    else:
+        # Use default PERMISSION_ROLE_MAP  
+        from .permissions import PERMISSION_ROLE_MAP
+        for permission, allowed_roles in PERMISSION_ROLE_MAP.items():
+            for role in ParticipantRole:
+                matrix[permission][role] = role in allowed_roles
+    
+    # Prepare data for template
+    roles = [role for role in ParticipantRole]
+    permissions = [perm for perm in ContractPermission]
+    
+    # Role descriptions
+    role_descriptions = {
+        'OWNER': 'Contract creator/owner',
+        'SALES': 'Sales representative',
+        'LEGAL': 'Legal team reviewer',
+        'CUSTOMER': 'External customer',
+        'SIGNATORY': 'Authorized signer',
+        'APPROVER': 'Final approver'
+    }
+    
+    context = {
+        'roles': roles,
+        'permissions': permissions,
+        'matrix': matrix,
+        'role_descriptions': role_descriptions,
+        'total_permissions': len(permissions),
+        'total_roles': len(roles),
+    }
+    
+    return render(request, 'contracts/permission_matrix.html', context)
+
+
+@login_required
+def request_document_revision(request, contract_id, document_id):
+    """
+    Legal reviewer requests a document to be revised/corrected
+    """
+    contract = get_object_or_404(Contract, id=contract_id)
+    document = get_object_or_404(BusinessEntityDocument, id=document_id, contract=contract)
+    
+    # Check if user is legal reviewer
+    if not can_update_contract_status(request.user, contract):
+        messages.error(request, "You don't have permission to request document revisions.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    if request.method == 'POST':
+        reason = request.POST.get('reason', '').strip()
+        
+        if not reason:
+            messages.error(request, "Please provide a reason for the revision request.")
+            return redirect('contract_detail', pk=contract_id)
+
+        if document.revision_requests.filter(
+            status__in=[
+                DocumentRevisionRequest.RevisionStatus.PENDING,
+                DocumentRevisionRequest.RevisionStatus.REVISED,
+            ]
+        ).exists():
+            messages.warning(request, "This document already has an open revision request.")
+            return redirect('contract_detail', pk=contract_id)
+        
+        # Create revision request
+        revision_request = DocumentRevisionRequest.objects.create(
+            document=document,
+            requested_by=request.user,
+            reason=reason
+        )
+
+        AuditLog.objects.create(
+            contract=contract,
+            action='DOCUMENT_REVISION_REQUESTED',
+            user=request.user,
+            details=(
+                f"Revision requested for {document.get_document_type_display()}: {reason}"
+            )
+        )
+
+        EmailService.send_document_revision_requested_email(
+            contract=contract,
+            document=document,
+            requested_by=request.user,
+            reason=reason,
+        )
+
+        _notify_contract_activity(
+            contract,
+            request.user,
+            'Document Revision Requested',
+            f'{document.get_document_type_display()} revision requested. Reason: {reason}',
+            event_key='activity_status_updated',
+        )
+        
+        messages.success(request, "Revision request sent to document uploader.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    context = {
+        'contract': contract,
+        'document': document,
+    }
+    return render(request, 'contracts/request_document_revision.html', context)
+
+
+@login_required
+def upload_revised_document(request, contract_id, revision_request_id):
+    """
+    Sales person uploads a revised/corrected document
+    """
+    contract = get_object_or_404(Contract, id=contract_id)
+    revision_request = get_object_or_404(
+        DocumentRevisionRequest,
+        id=revision_request_id,
+        document__contract=contract,
+    )
+    
+    # Check if user is document owner or contract owner
+    if request.user != revision_request.document.uploaded_by and request.user != contract.owner:
+        messages.error(request, "You don't have permission to upload revisions for this document.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    if request.method == 'POST':
+        if revision_request.status != DocumentRevisionRequest.RevisionStatus.PENDING:
+            messages.error(request, "This revision request is not in pending state.")
+            return redirect('contract_detail', pk=contract_id)
+
+        revised_file = request.FILES.get('revised_document')
+        
+        if not revised_file:
+            messages.error(request, "Please select a file to upload.")
+            return redirect('contract_detail', pk=contract_id)
+        
+        # Update revision request with revised document
+        revision_request.revised_document = revised_file
+        revision_request.revised_by = request.user
+        revision_request.revised_at = timezone.now()
+        revision_request.status = DocumentRevisionRequest.RevisionStatus.REVISED
+        revision_request.save()
+
+        AuditLog.objects.create(
+            contract=contract,
+            action='DOCUMENT_REVISION_UPLOADED',
+            user=request.user,
+            details=(
+                f"Revised document uploaded for "
+                f"{revision_request.document.get_document_type_display()}"
+            )
+        )
+
+        EmailService.send_document_revision_uploaded_email(
+            contract=contract,
+            revision_request=revision_request,
+            uploaded_by=request.user,
+        )
+
+        _notify_contract_activity(
+            contract,
+            request.user,
+            'Revised Document Uploaded',
+            f'Revised {revision_request.document.get_document_type_display()} uploaded for legal review.',
+            event_key='activity_document_uploaded',
+        )
+        
+        messages.success(request, "Revised document uploaded successfully. Awaiting legal review.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    context = {
+        'contract': contract,
+        'revision_request': revision_request,
+        'document': revision_request.document,
+    }
+    return render(request, 'contracts/upload_revised_document.html', context)
+
+
+@login_required
+def approve_revised_document(request, contract_id, revision_request_id):
+    """
+    Legal reviewer approves the revised document
+    """
+    contract = get_object_or_404(Contract, id=contract_id)
+    revision_request = get_object_or_404(
+        DocumentRevisionRequest,
+        id=revision_request_id,
+        document__contract=contract,
+    )
+    
+    # Check if user is legal reviewer
+    if not can_update_contract_status(request.user, contract):
+        messages.error(request, "You don't have permission to approve documents.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    if request.method == 'POST':
+        approval_notes = request.POST.get('approval_notes', '').strip()
+
+        if not revision_request.revised_document:
+            messages.error(request, "No revised document found to approve.")
+            return redirect('contract_detail', pk=contract_id)
+        
+        # Update original document with revised version
+        revision_request.document.document = revision_request.revised_document
+        revision_request.document.save()
+        
+        # Mark revision request as approved
+        revision_request.status = DocumentRevisionRequest.RevisionStatus.APPROVED
+        revision_request.approved_by = request.user
+        revision_request.approved_at = timezone.now()
+        revision_request.approval_notes = approval_notes
+        revision_request.save()
+
+        AuditLog.objects.create(
+            contract=contract,
+            action='DOCUMENT_REVISION_APPROVED',
+            user=request.user,
+            details=(
+                f"Revised document approved for "
+                f"{revision_request.document.get_document_type_display()}"
+            )
+        )
+
+        EmailService.send_document_revision_result_email(
+            contract=contract,
+            revision_request=revision_request,
+            approved=True,
+            reviewed_by=request.user,
+            notes=approval_notes,
+        )
+
+        _notify_contract_activity(
+            contract,
+            request.user,
+            'Revised Document Approved',
+            f'{revision_request.document.get_document_type_display()} revision approved.',
+            event_key='activity_status_updated',
+        )
+        
+        messages.success(request, "Document approved successfully.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    context = {
+        'contract': contract,
+        'revision_request': revision_request,
+    }
+    return render(request, 'contracts/approve_revised_document.html', context)
+
+
+@login_required
+def reject_revised_document(request, contract_id, revision_request_id):
+    """
+    Legal reviewer rejects the revised document and requires re-submission
+    """
+    contract = get_object_or_404(Contract, id=contract_id)
+    revision_request = get_object_or_404(
+        DocumentRevisionRequest,
+        id=revision_request_id,
+        document__contract=contract,
+    )
+    
+    # Check if user is legal reviewer
+    if not can_update_contract_status(request.user, contract):
+        messages.error(request, "You don't have permission to reject documents.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    if request.method == 'POST':
+        rejection_reason = request.POST.get('rejection_reason', '').strip()
+        
+        if not rejection_reason:
+            messages.error(request, "Please provide a reason for rejection.")
+            return redirect('contract_detail', pk=contract_id)
+
+        EmailService.send_document_revision_result_email(
+            contract=contract,
+            revision_request=revision_request,
+            approved=False,
+            reviewed_by=request.user,
+            notes=rejection_reason,
+        )
+
+        _notify_contract_activity(
+            contract,
+            request.user,
+            'Revised Document Rejected',
+            f'{revision_request.document.get_document_type_display()} revision rejected. Reason: {rejection_reason}',
+            event_key='activity_status_updated',
+        )
+
+        # Reset revision request to PENDING so it can be revised again
+        revision_request.status = DocumentRevisionRequest.RevisionStatus.PENDING
+        revision_request.revised_document = None
+        revision_request.revised_by = None
+        revision_request.revised_at = None
+        revision_request.approval_notes = rejection_reason
+        revision_request.save()
+
+        AuditLog.objects.create(
+            contract=contract,
+            action='DOCUMENT_REVISION_REJECTED',
+            user=request.user,
+            details=(
+                f"Revised document rejected for "
+                f"{revision_request.document.get_document_type_display()}: {rejection_reason}"
+            )
+        )
+        
+        messages.success(request, "Document rejected. Document uploader has been notified to revise again.")
+        return redirect('contract_detail', pk=contract_id)
+    
+    context = {
+        'contract': contract,
+        'revision_request': revision_request,
+    }
+    return render(request, 'contracts/reject_revised_document.html', context)
+

@@ -24,7 +24,7 @@ docker-compose up --build
 - Starting PostgreSQL database
 - Starting Redis
 - Running Django migrations
-- Creating superuser automatically
+- Creating superuser automatically (only if `DJANGO_SUPERUSER_*` env vars are set)
 - Starting Celery worker and beat
 - Starting Nginx
 
@@ -38,9 +38,11 @@ Open your browser and go to:
 
 **Application:** http://localhost
 
-**Login with:**
-- Username: `admin`
-- Password: `admin123`
+**Login with your configured superuser account.**
+
+If you have not created one yet:
+- Set `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, `DJANGO_SUPERUSER_PASSWORD` and restart
+- Or run: `docker-compose exec web python manage.py createsuperuser`
 
 ---
 

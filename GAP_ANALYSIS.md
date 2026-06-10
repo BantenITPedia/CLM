@@ -925,9 +925,9 @@ Related Records:
 - Redis URL configured
 - Email backend via environment
 
-**Default Credentials:**
-- Django admin: `admin` / `admin123`
-- Database: `clm_user` / `clm_pass123`
+**Credential Policy:**
+- Django admin credentials must be configured via environment variables or `createsuperuser`
+- Database credentials are environment-managed
 
 ---
 

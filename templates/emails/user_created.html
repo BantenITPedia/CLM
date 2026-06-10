@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>User Created</title>
+</head>
+<body>
+    {% if is_new_user_notification %}
+    <p>Hello {{ target_user_name|default:target_user.username }},</p>
+
+    <p>Your account in <strong>Legal CLM</strong> has been created.</p>
+
+    <ul>
+        <li><strong>Username:</strong> {{ target_user.username }}</li>
+        <li><strong>Email:</strong> {{ target_user_email }}</li>
+        <li><strong>Created by:</strong> {{ actor_name }}</li>
+    </ul>
+
+    <p>
+        You can sign in here:
+        <a href="{{ login_url }}">{{ login_url }}</a>
+    </p>
+
+    <p>
+        For security reasons, passwords are never sent by email.
+        To set or reset your password, use this link:
+        <a href="{{ password_reset_url }}">{{ password_reset_url }}</a>
+    </p>
+    {% else %}
+    <p>Hi Team,</p>
+
+    <p>A user account was <strong>created</strong> in Legal CLM.</p>
+
+    <ul>
+        <li><strong>Username:</strong> {{ target_user.username }}</li>
+        <li><strong>Name:</strong> {{ target_user_name }}</li>
+        <li><strong>Email:</strong> {{ target_user_email }}</li>
+        <li><strong>is_staff:</strong> {{ target_user.is_staff }}</li>
+        <li><strong>is_superuser:</strong> {{ target_user.is_superuser }}</li>
+        <li><strong>is_active:</strong> {{ target_user.is_active }}</li>
+        <li><strong>Created by:</strong> {{ actor_name }}{% if actor_email %} ({{ actor_email }}){% endif %}</li>
+    </ul>
+
+    <p>
+        Open Users Admin:
+        <a href="{{ site_url }}/admin/auth/user/">{{ site_url }}/admin/auth/user/</a>
+    </p>
+    {% endif %}
+
+    <p>Best regards,<br>Legal CLM System</p>
+</body>
+</html>

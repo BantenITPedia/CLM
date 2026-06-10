@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Create Contract" %} - {% trans "Step 1" %}{% endblock %}
+{% block page_title %}{% trans "Create Contract" %}{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">{% trans "Contract Wizard" %}</h6>
+                        <span class="badge bg-primary">{% trans "Step 1 of 4" %}</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar" role="progressbar" style="width: 25%;"></div>
+                    </div>
+                    <div class="row mt-3 text-center small text-muted">
+                        <div class="col"><strong class="text-primary">{% trans "1. Entity Type" %}</strong></div>
+                        <div class="col">{% trans "2. Admin Docs" %}</div>
+                        <div class="col">{% trans "3. Contract Info" %}</div>
+                        <div class="col">{% trans "4. Structured Data" %}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4">
+                    <h4 class="mb-1">{% trans "Select Business Entity Type" %}</h4>
+                    <p class="text-muted mb-0">{% trans "Start by choosing the legal form of the partner company." %}</p>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>{% trans "Hint" %}:</strong> {% trans "This selection controls which administrative documents will be required in the next step." %}
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">{{ form.business_entity_type.label }}</label>
+                            {% for choice in form.business_entity_type %}
+                            <label class="d-flex align-items-center border rounded p-3 mb-2 bg-light-subtle" for="{{ choice.id_for_label }}">
+                                <span class="me-2">{{ choice.tag }}</span>
+                                <span>{{ choice.choice_label }}</span>
+                            </label>
+                            {% endfor %}
+                            {% if form.business_entity_type.errors %}
+                            <div class="text-danger small">{{ form.business_entity_type.errors|striptags }}</div>
+                            {% endif %}
+                            {% if form.business_entity_type.help_text %}
+                            <small class="text-muted">{{ form.business_entity_type.help_text }}</small>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+                            <button type="submit" class="btn btn-primary px-4">{% trans "Continue" %}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

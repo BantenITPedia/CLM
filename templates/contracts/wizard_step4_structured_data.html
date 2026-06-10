@@ -1,0 +1,403 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Create Contract" %} - {% trans "Step 4" %}{% endblock %}
+{% block page_title %}{% trans "Create Contract" %}{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">{% trans "Contract Wizard" %}</h6>
+                        <span class="badge bg-success">{% trans "Final Step" %}</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 100%;"></div>
+                    </div>
+                    <div class="row mt-3 text-center small text-muted">
+                        <div class="col text-success">{% trans "1. Entity Type" %}</div>
+                        <div class="col text-success">{% trans "2. Admin Docs" %}</div>
+                        <div class="col text-success">{% trans "3. Contract Info" %}</div>
+                        <div class="col"><strong class="text-success">{% trans "4. Structured Data" %}</strong></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4">
+                    <h4 class="mb-1">{% trans "Structured Data" %}</h4>
+                    <p class="text-muted mb-0">{% trans "Complete the final fields to generate and submit the contract package." %}</p>
+                </div>
+                <div class="card-body">
+                    {% if data_form %}
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        {% if auto_filled_summary %}
+                        <div class="alert alert-info border-0 shadow-sm">
+                            <strong>{% trans "Auto-filled from previous steps" %}</strong>
+                            <ul class="mb-0 mt-2">
+                                {% for item in auto_filled_summary %}
+                                <li><strong>{{ item.label }}:</strong> {{ item.value }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        <div class="alert alert-light border mb-4">
+                            <strong>{% trans "Hint" %}:</strong> {% trans "Required fields must be filled to avoid validation failure and rework." %}
+                        </div>
+
+                        {% if data_form.errors %}
+                        <div class="alert alert-danger mb-4" role="alert">
+                            <strong>{% trans "Cannot create contract yet." %}</strong>
+                            <ul class="mb-0 mt-2">
+                                {% for field in data_form %}
+                                    {% if field.errors %}
+                                    <li>{{ field.label }}: {{ field.errors|striptags }}</li>
+                                    {% endif %}
+                                {% endfor %}
+                                {% for err in data_form.non_field_errors %}
+                                <li>{{ err }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+
+                        {% if contract.contract_type == 'DISTRIBUTOR' %}
+                        <div class="alert alert-primary border-0 shadow-sm mb-3">
+                            <strong>{% trans "Distributor quick guide" %}:</strong> {% trans "Fill sections from top to bottom. This layout is grouped by agreement parts to reduce scrolling and confusion." %}
+                        </div>
+
+                        <div class="card border-0 bg-light mb-3">
+                            <div class="card-body py-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <strong>{% trans "Auto-filled from previous steps" %}</strong>
+                                    <span class="badge bg-success">{% trans "No input needed" %}</span>
+                                </div>
+                                <div class="row g-2 small">
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-2 bg-white">
+                                            <div class="text-muted">Lampiran A - Nama Tempat Pihak Kedua</div>
+                                            <div class="fw-semibold">{{ initial_data.second_party_place_name|default:contract.party_b|default:'-' }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-2 bg-white">
+                                            <div class="text-muted">Lampiran A - Kriteria Pihak Kedua</div>
+                                            <div class="fw-semibold">{{ initial_data.second_party_criteria|default:contract.business_entity_type|default:'-' }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 bg-light mb-3">
+                            <div class="card-body py-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <strong>{% trans "Completion Progress" %}</strong>
+                                    <span class="badge bg-primary" id="dist-overall-progress-text">0/0 required</span>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    <div class="progress-bar" id="dist-overall-progress-bar" role="progressbar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <a class="btn btn-sm btn-outline-primary" href="#group-party">Party & Legal</a>
+                            <a class="btn btn-sm btn-outline-primary" href="#group-lampiran-a">Lampiran A</a>
+                            <a class="btn btn-sm btn-outline-primary" href="#group-lampiran-b">Lampiran B</a>
+                            <a class="btn btn-sm btn-outline-primary" href="#group-lampiran-c">Lampiran C</a>
+                        </div>
+
+                        <div class="card mb-3" id="group-party">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <strong>{% trans "Party & Legal Information" %}</strong>
+                                <span class="badge bg-secondary" id="group-party-progress">0/0</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% for field in data_form %}
+                                    {% if field.name == 'target_schema' or field.name == 'party_b_name' or field.name == 'party_b_legal_name' or field.name == 'party_b_registered_address' or field.name == 'party_b_representative_name' or field.name == 'party_b_authorized_representative_name' or field.name == 'party_b_representative_title' or field.name == 'party_b_authorized_representative_title' or field.name == 'business_form' or field.name == 'wilayah_operasional' %}
+                                    <div class="col-md-6 mb-3 distributor-field-wrapper" data-field-name="{{ field.name }}">
+                                        <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                            {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                        </label>
+                                        {{ field }}
+                                        {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                        <small class="text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3" id="group-lampiran-a">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <strong>Lampiran A - Outlet Information</strong>
+                                <span class="badge bg-secondary" id="group-lampiran-a-progress">0/0</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% for field in data_form %}
+                                    {% if field.name == 'second_party_place_name' or field.name == 'second_party_place_address' or field.name == 'cvcode_number' or field.name == 'second_party_criteria' or field.name == 'product_scope_text_distributor' or field.name == 'delivery_address' or field.name == 'percentage_benefit' %}
+                                    <div class="col-md-6 mb-3 distributor-field-wrapper" data-field-name="{{ field.name }}">
+                                        <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                            {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                        </label>
+                                        {{ field }}
+                                        {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                        <small class="text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3" id="group-lampiran-b">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <strong>{% trans "Lampiran B - Target Sales" %}</strong>
+                                <span class="badge bg-secondary" id="group-lampiran-b-progress">0/0</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% for field in data_form %}
+                                    {% if field.name == 'total_purchase_target' or field.name == 'total_target_qtr' or field.name == 'quarter_1_period' or field.name == 'sales_target_q1' or field.name == 'quarter_2_period' or field.name == 'sales_target_q2' or field.name == 'quarter_3_period' or field.name == 'sales_target_q3' or field.name == 'quarter_4_period' or field.name == 'sales_target_q4' or field.name == 'non_prd_list' or field.name == 'inc_prd_list' or field.name == 'bank_grt' or field.name == 'custom_period_target_notes' %}
+                                    <div class="col-md-6 mb-3 distributor-field-wrapper" data-field-name="{{ field.name }}">
+                                        <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                            {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                        </label>
+                                        {{ field }}
+                                        {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                        <small class="text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3" id="group-lampiran-c">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <strong>{% trans "Lampiran C - Incentive Scheme" %}</strong>
+                                <span class="badge bg-secondary" id="group-lampiran-c-progress">0/0</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% for field in data_form %}
+                                    {% if field.name == 'incentive_scheme_text_distributor' or field.name == 'incentive_scheme_notes' %}
+                                    <div class="col-12 mb-3 distributor-field-wrapper" data-field-name="{{ field.name }}">
+                                        <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                            {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                        </label>
+                                        {{ field }}
+                                        {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                        <small class="text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3" id="group-other-fields">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <strong>{% trans "Additional Fields" %}</strong>
+                                <span class="badge bg-secondary">{% trans "Auto-detected" %}</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    {% for field in data_form %}
+                                    {% if field.name != 'target_schema' and field.name != 'party_b_name' and field.name != 'party_b_legal_name' and field.name != 'party_b_registered_address' and field.name != 'party_b_representative_name' and field.name != 'party_b_authorized_representative_name' and field.name != 'party_b_representative_title' and field.name != 'party_b_authorized_representative_title' and field.name != 'business_form' and field.name != 'wilayah_operasional' and field.name != 'second_party_place_name' and field.name != 'second_party_place_address' and field.name != 'cvcode_number' and field.name != 'second_party_criteria' and field.name != 'product_scope_text_distributor' and field.name != 'delivery_address' and field.name != 'percentage_benefit' and field.name != 'total_purchase_target' and field.name != 'total_target_qtr' and field.name != 'quarter_1_period' and field.name != 'sales_target_q1' and field.name != 'quarter_2_period' and field.name != 'sales_target_q2' and field.name != 'quarter_3_period' and field.name != 'sales_target_q3' and field.name != 'quarter_4_period' and field.name != 'sales_target_q4' and field.name != 'non_prd_list' and field.name != 'inc_prd_list' and field.name != 'bank_grt' and field.name != 'custom_period_target_notes' and field.name != 'incentive_scheme_text_distributor' and field.name != 'incentive_scheme_notes' %}
+                                    <div class="col-md-6 mb-3 distributor-field-wrapper" data-field-name="{{ field.name }}">
+                                        <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                            {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                        </label>
+                                        {{ field }}
+                                        {% if field.errors %}
+                                        <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                        <small class="text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="row">
+                            {% for field in data_form %}
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                    {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                {{ field }}
+                                {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                {% endif %}
+                                {% if field.help_text %}
+                                <small class="text-muted">{{ field.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'contract_wizard_step3' %}" class="btn btn-outline-secondary">{% trans "Back" %}</a>
+                            <div>
+                                <a href="{% url 'contract_wizard_cancel' %}" class="btn btn-outline-danger me-2">{% trans "Cancel" %}</a>
+                                <button type="submit" class="btn btn-success px-4">{% trans "Finish and Create Contract" %}</button>
+                            </div>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="alert alert-warning mb-3">{% trans "No structured data fields are configured for this contract type." %}</div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'contract_wizard_step3' %}" class="btn btn-secondary">{% trans "Back" %}</a>
+                        <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-success">{% trans "Go to Contract Detail" %}</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const isDistributor = '{{ contract.contract_type }}' === 'DISTRIBUTOR';
+        if (!isDistributor) return;
+
+        const targetSchemaField = document.querySelector('[name="target_schema"]');
+        const customNotesField = document.querySelector('[data-field-name="custom_period_target_notes"]');
+        const overallBar = document.getElementById('dist-overall-progress-bar');
+        const overallText = document.getElementById('dist-overall-progress-text');
+
+        const getPrimaryControl = (wrapper) => wrapper.querySelector('input, select, textarea');
+
+        const isFilled = (control) => {
+            if (!control) return false;
+            const value = (control.value || '').toString().trim();
+            if (control.type === 'checkbox' || control.type === 'radio') {
+                return control.checked;
+            }
+            return value !== '';
+        };
+
+        const isVisibleWrapper = (wrapper) => wrapper && wrapper.offsetParent !== null;
+
+        const updateGroupProgress = (groupId, badgeId) => {
+            const group = document.getElementById(groupId);
+            const badge = document.getElementById(badgeId);
+            if (!group || !badge) return { required: 0, done: 0 };
+
+            const wrappers = Array.from(group.querySelectorAll('.distributor-field-wrapper')).filter(isVisibleWrapper);
+            const requiredWrappers = wrappers.filter((wrapper) => {
+                const control = getPrimaryControl(wrapper);
+                return !!(control && control.required);
+            });
+
+            const done = requiredWrappers.filter((wrapper) => isFilled(getPrimaryControl(wrapper))).length;
+            const required = requiredWrappers.length;
+
+            badge.textContent = `${done}/${required}`;
+            badge.className = `badge ${required > 0 && done === required ? 'bg-success' : 'bg-secondary'}`;
+            return { required, done };
+        };
+
+        const updateDistributorProgress = () => {
+            const groups = [
+                ['group-party', 'group-party-progress'],
+                ['group-lampiran-a', 'group-lampiran-a-progress'],
+                ['group-lampiran-b', 'group-lampiran-b-progress'],
+                ['group-lampiran-c', 'group-lampiran-c-progress'],
+            ];
+
+            let totalRequired = 0;
+            let totalDone = 0;
+            groups.forEach(([groupId, badgeId]) => {
+                const stats = updateGroupProgress(groupId, badgeId);
+                totalRequired += stats.required;
+                totalDone += stats.done;
+            });
+
+            const percent = totalRequired > 0 ? Math.round((totalDone / totalRequired) * 100) : 0;
+            if (overallBar) {
+                overallBar.style.width = `${percent}%`;
+                overallBar.className = `progress-bar ${percent === 100 ? 'bg-success' : 'bg-primary'}`;
+            }
+            if (overallText) {
+                overallText.textContent = `${totalDone}/${totalRequired} required`;
+                overallText.className = `badge ${percent === 100 ? 'bg-success' : 'bg-primary'}`;
+            }
+        };
+
+        const applyDistributorFieldMode = () => {
+            if (!targetSchemaField || !customNotesField) return;
+            const schema = (targetSchemaField.value || '').toLowerCase();
+            const showQuarterFields = schema !== 'yearly_only';
+
+            [
+                'total_target_qtr',
+                'quarter_1_period', 'sales_target_q1',
+                'quarter_2_period', 'sales_target_q2',
+                'quarter_3_period', 'sales_target_q3',
+                'quarter_4_period', 'sales_target_q4'
+            ].forEach((name) => {
+                const wrapper = document.querySelector(`[data-field-name="${name}"]`);
+                if (!wrapper) return;
+                wrapper.style.display = showQuarterFields ? '' : 'none';
+            });
+
+            customNotesField.style.display = schema === 'custom_period' ? '' : 'none';
+            updateDistributorProgress();
+        };
+
+        ['quarter_1_period', 'quarter_2_period', 'quarter_3_period', 'quarter_4_period'].forEach((name) => {
+            const field = document.querySelector(`[name="${name}"]`);
+            if (!field) return;
+            field.readOnly = true;
+            field.classList.add('bg-light');
+        });
+
+        applyDistributorFieldMode();
+        if (targetSchemaField) {
+            targetSchemaField.addEventListener('change', applyDistributorFieldMode);
+        }
+
+        document.querySelectorAll('.distributor-field-wrapper input, .distributor-field-wrapper select, .distributor-field-wrapper textarea').forEach((el) => {
+            el.addEventListener('input', updateDistributorProgress);
+            el.addEventListener('change', updateDistributorProgress);
+        });
+
+        updateDistributorProgress();
+    });
+</script>
+{% endblock %}

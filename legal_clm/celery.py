@@ -18,6 +18,10 @@ app.conf.beat_schedule = {
         'task': 'contracts.tasks.send_renewal_reminders',
         'schedule': crontab(hour=10, minute=0),  # Run daily at 10 AM
     },
+    'auto-terminate-expired-contracts': {
+        'task': 'contracts.tasks.auto_terminate_expired_contracts',
+        'schedule': crontab(hour=0, minute=5),  # Run daily at 00:05
+    },
 }
 
 @app.task(bind=True)

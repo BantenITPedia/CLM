@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}{{ action }} Contract - Legal CLM{% endblock %}
-{% block page_title %}{{ action }} Contract{% endblock %}
+{% block title %}{{ action }} {% trans "Contract" %} - Legal CLM{% endblock %}
+{% block page_title %}{{ action }} {% trans "Contract" %}{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -10,13 +11,13 @@
             <div class="card">
                 <div class="card-header bg-white">
                     <h5 class="mb-0">
-                        <i class="bi bi-file-earmark-text"></i> {{ action }} Contract
+                        <i class="bi bi-file-earmark-text"></i> {{ action }} {% trans "Contract" %}
                     </h5>
                 </div>
                 <div class="card-body">
                     {% if form.errors %}
                     <div class="alert alert-danger">
-                        <strong>Please correct the errors below:</strong>
+                        <strong>{% trans "Please correct the errors below:" %}</strong>
                         <ul class="mb-0">
                             {% for field, errors in form.errors.items %}
                                 {% for error in errors %}
@@ -30,7 +31,7 @@
                         {% csrf_token %}
                         <div class="row">
                             <div class="col-md-12 mb-3">
-                                <label for="{{ form.title.id_for_label }}" class="form-label">Contract Title *</label>
+                                <label for="{{ form.title.id_for_label }}" class="form-label">{% trans "Contract Title" %} *</label>
                                 {{ form.title }}
                                 {% if form.title.errors %}
                                     <div class="text-danger">{{ form.title.errors }}</div>
@@ -40,34 +41,60 @@
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                    <label for="{{ form.contract_type.id_for_label }}" class="form-label">Contract Type *</label>
+                                    <label for="{{ form.contract_type.id_for_label }}" class="form-label">{% trans "Contract Type" %} *</label>
                                     {{ form.contract_type }}
                                     {% if form.contract_type.errors %}
                                         <div class="text-danger">{{ form.contract_type.errors }}</div>
                                     {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.contract_value.id_for_label }}" class="form-label">Target Value (IDR)</label>
+                                <label for="{{ form.contract_value.id_for_label }}" class="form-label">{% trans "Target Value (IDR)" %}</label>
                                 {{ form.contract_value }}
-                                <small class="form-text text-muted">Format: 1,000,000</small>
+                                <small class="form-text text-muted">{% trans "Format: 1,000,000" %}</small>
                             </div>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-12 mb-3">
-                                <label for="{{ form.party_b.id_for_label }}" class="form-label">Legal Entity Name (PT / CV / Others) *</label>
+                                <label for="{{ form.party_b.id_for_label }}" class="form-label">{% trans "Legal Entity Name (PT / CV / Others)" %} *</label>
                                 {{ form.party_b }}
                             </div>
                         </div>
+
+                        {% if form.cv_code %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.cv_code.id_for_label }}" class="form-label">{% trans "CV Code" %} *</label>
+                                {{ form.cv_code }}
+                                {% if form.cv_code.errors %}
+                                    <div class="text-danger">{{ form.cv_code.errors }}</div>
+                                {% endif %}
+                                {% if form.cv_code.help_text %}
+                                    <small class="form-text text-muted">{{ form.cv_code.help_text }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
                         
                         {% if data_form %}
                         <div class="card mb-3">
                             <div class="card-header bg-light">
-                                <strong>General Trade Agreement Fields</strong>
+                                <strong>
+                                    {% if contract_type_code == 'DISTRIBUTOR' %}
+                                    {% trans "Distributor Agreement Fields" %}
+                                    {% elif contract_type_code == 'GENERAL_TRADE' or contract_type_code == 'GENERAL_TRADE_PREMIUM' %}
+                                    {% trans "General Trade Agreement Fields" %}
+                                    {% else %}
+                                    {% trans "Contract Structured Data Fields" %}
+                                    {% endif %}
+                                </strong>
                             </div>
                             <div class="card-body">
+                                <p class="text-muted small mb-3">{% trans "Tip: auto-calculated fields are read-only. The form uses two columns to reduce vertical stacking on edit." %}</p>
+                                <div class="row g-3">
                                 {% for field in data_form %}
-                                <div class="mb-3">
+                                {% if not is_gt_contract or field.name != 'party_b_name' and field.name != 'contract_start_date' and field.name != 'contract_end_date' and field.name != 'business_form' and field.name != 'quarter_1_period' and field.name != 'quarter_2_period' and field.name != 'quarter_3_period' and field.name != 'quarter_4_period' and field.name != 'total_purchase_target' and field.name != 'sales_target_q1' and field.name != 'sales_target_q2' and field.name != 'sales_target_q3' and field.name != 'sales_target_q4' and field.name != 'cvcodenumber' and field.name != 'cvcode_number' and field.name != 'payment_terms' %}
+                                <div class="dynamic-field-wrapper {% if field.field.widget.input_type == 'textarea' %}col-12{% else %}col-md-6{% endif %}">
                                     <label class="form-label" for="{{ field.id_for_label }}">
                                         {{ field.label }}
                                         {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
@@ -80,58 +107,45 @@
                                     <small class="form-text text-muted">{{ field.help_text }}</small>
                                     {% endif %}
                                 </div>
+                                {% endif %}
                                 {% endfor %}
+                                </div>
                             </div>
                         </div>
                         {% endif %}
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.start_date.id_for_label }}" class="form-label">Start Date</label>
+                                <label for="{{ form.start_date.id_for_label }}" class="form-label">{% trans "Start Date" %}</label>
                                 {{ form.start_date }}
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.end_date.id_for_label }}" class="form-label">End Date</label>
-                                {{ form.end_date }}
-                                <small class="form-text text-muted">Auto-calculated as: Start Date + 1 year - 1 day</small>
+                                <label for="{{ form.duration_days.id_for_label }}" class="form-label">{% trans "Duration (days)" %}</label>
+                                {{ form.duration_days }}
+                                {% if form.duration_days.errors %}
+                                    <div class="text-danger">{{ form.duration_days.errors }}</div>
+                                {% endif %}
                             </div>
                         </div>
-                        
-                        <div class="card mb-3">
-                            <div class="card-header bg-light">
-                                <strong>Renewal Settings</strong>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-4 mb-3">
-                                        <label for="{{ form.renewal_reminder_days.id_for_label }}" class="form-label">Reminder Days Before Expiry</label>
-                                        {{ form.renewal_reminder_days }}
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <label for="{{ form.renewal_period_months.id_for_label }}" class="form-label">Renewal Period (Months)</label>
-                                        {{ form.renewal_period_months }}
-                                    </div>
-                                    <div class="col-md-4 mb-3">
-                                        <div class="form-check mt-4">
-                                            {{ form.auto_renew }}
-                                            <label class="form-check-label" for="{{ form.auto_renew.id_for_label }}">
-                                                Auto-Renew Contract
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.end_date.id_for_label }}" class="form-label">{% trans "End Date" %}</label>
+                                {{ form.end_date }}
+                                <input type="hidden" name="calculated_end_date" id="calculated_end_date" value="">
+                                <small class="form-text text-muted">{% trans "Auto-calculated from Start Date + Duration (days)." %}</small>
                             </div>
                         </div>
                         
                         <div class="card mb-3" id="additional-documents-card">
                             <div class="card-header bg-light">
-                                <strong>Additional Documents</strong>
+                                <strong>{% trans "Additional Documents" %}</strong>
                             </div>
                             <div class="card-body">
                                 <div id="additional-documents-container">
                                     <div class="row g-2 mb-2 document-row">
                                         <div class="col-md-5">
-                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="Document Title">
+                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="{% trans 'Document Title' %}">
                                         </div>
                                         <div class="col-md-7">
                                             <input type="file" name="additional_documents" class="form-control">
@@ -139,7 +153,7 @@
                                     </div>
                                     <div class="row g-2 mb-2 document-row">
                                         <div class="col-md-5">
-                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="Document Title">
+                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="{% trans 'Document Title' %}">
                                         </div>
                                         <div class="col-md-7">
                                             <input type="file" name="additional_documents" class="form-control">
@@ -147,7 +161,7 @@
                                     </div>
                                     <div class="row g-2 mb-2 document-row">
                                         <div class="col-md-5">
-                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="Document Title">
+                                            <input type="text" name="additional_document_titles" class="form-control" placeholder="{% trans 'Document Title' %}">
                                         </div>
                                         <div class="col-md-7">
                                             <input type="file" name="additional_documents" class="form-control">
@@ -155,22 +169,22 @@
                                     </div>
                                 </div>
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="add-document-row">
-                                    <i class="bi bi-plus-circle"></i> Add another document
+                                    <i class="bi bi-plus-circle"></i> {% trans "Add another document" %}
                                 </button>
                             </div>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">{% trans "Notes" %}</label>
                             {{ form.notes }}
                         </div>
                         
                         <div class="d-flex justify-content-between">
                             <a href="{% url 'contract_list' %}" class="btn btn-secondary">
-                                <i class="bi bi-x-circle"></i> Cancel
+                                <i class="bi bi-x-circle"></i> {% trans "Cancel" %}
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> {{ action }} Contract
+                                <i class="bi bi-check-circle"></i> {{ action }} {% trans "Contract" %}
                             </button>
                         </div>
                     </form>
@@ -183,6 +197,90 @@
 <script>
     // Format target value with thousand separators
     document.addEventListener('DOMContentLoaded', function() {
+        const contractTypeCode = '{{ contract_type_code|default:"" }}';
+        const isGtContract = ['GENERAL_TRADE', 'GENERAL_TRADE_PREMIUM'].includes(contractTypeCode);
+        const isDistributorContract = contractTypeCode === 'DISTRIBUTOR';
+
+        const setFieldVisibility = (fieldName, isVisible) => {
+            const field = document.querySelector(`[name="${fieldName}"]`);
+            if (!field) return;
+            const wrapper = field.closest('.dynamic-field-wrapper') || field.closest('.mb-3');
+            if (wrapper) {
+                wrapper.style.display = isVisible ? '' : 'none';
+            }
+        };
+
+        const applyDistributorFieldMode = () => {
+            if (!isDistributorContract) return;
+
+            const targetSchemaField = document.querySelector('[name="target_schema"]');
+            const schema = ((targetSchemaField && targetSchemaField.value) || '').toLowerCase();
+            const showQuarterFields = schema !== 'yearly_only';
+            const showCustomNotes = schema === 'custom_period';
+
+            [
+                'total_target_qtr',
+                'quarter_1_period', 'sales_target_q1',
+                'quarter_2_period', 'sales_target_q2',
+                'quarter_3_period', 'sales_target_q3',
+                'quarter_4_period', 'sales_target_q4'
+            ].forEach((name) => setFieldVisibility(name, showQuarterFields));
+
+            setFieldVisibility('custom_period_target_notes', showCustomNotes);
+
+        };
+
+        const lockAutoManagedStructuredFields = () => {
+            if (!isGtContract) return;
+
+            const readonlyNames = [
+                'contract_start_date',
+                'contract_end_date',
+                'quarter_1_period',
+                'quarter_2_period',
+                'quarter_3_period',
+                'quarter_4_period',
+                'sales_target_q1',
+                'sales_target_q2',
+                'sales_target_q3',
+                'sales_target_q4',
+                'total_purchase_target'
+            ];
+
+            readonlyNames.forEach((fieldName) => {
+                const field = document.querySelector(`[name="${fieldName}"]`);
+                if (!field) return;
+                field.readOnly = true;
+                field.classList.add('bg-light');
+            });
+        };
+
+        const lockDistributorAutoManagedFields = () => {
+            if (!isDistributorContract) return;
+
+            [
+                'quarter_1_period',
+                'quarter_2_period',
+                'quarter_3_period',
+                'quarter_4_period'
+            ].forEach((fieldName) => {
+                const field = document.querySelector(`[name="${fieldName}"]`);
+                if (!field) return;
+                field.readOnly = true;
+                field.classList.add('bg-light');
+            });
+        };
+
+        const removeDeprecatedPaymentTermsField = () => {
+            const paymentTermsField = document.querySelector('[name="payment_terms"]');
+            if (paymentTermsField) {
+                const fieldWrapper = paymentTermsField.closest('.dynamic-field-wrapper') || paymentTermsField.closest('.mb-3');
+                if (fieldWrapper) {
+                    fieldWrapper.remove();
+                }
+            }
+        };
+
         const addDocButton = document.getElementById('add-document-row');
         const docsContainer = document.getElementById('additional-documents-container');
         if (addDocButton && docsContainer) {
@@ -244,25 +342,55 @@
             }
         }
         
-        // Auto-calculate end date (start date + 1 year - 1 day)
+        // Auto-calculate end date from start date + duration days.
         const startDateField = document.querySelector('input[name="start_date"]');
+        const durationDaysField = document.querySelector('input[name="duration_days"]');
         const endDateField = document.querySelector('input[name="end_date"]');
+
+        const calculateEndDate = () => {
+            if (!startDateField || !durationDaysField || !endDateField) return;
+
+            const startValue = startDateField.value;
+            const duration = Number(durationDaysField.value || 0);
+
+            if (!startValue || !Number.isInteger(duration) || duration <= 0) {
+                return;
+            }
+
+            const startDate = new Date(startValue);
+            if (Number.isNaN(startDate.getTime())) {
+                return;
+            }
+
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + duration);
+
+            const year = endDate.getFullYear();
+            const month = String(endDate.getMonth() + 1).padStart(2, '0');
+            const day = String(endDate.getDate()).padStart(2, '0');
+            const formattedDate = `${year}-${month}-${day}`;
+            
+            // Update both the disabled display field and the hidden field for submission
+            endDateField.value = formattedDate;
+            const hiddenField = document.getElementById('calculated_end_date');
+            if (hiddenField) {
+                hiddenField.value = formattedDate;
+            }
+        };
+
+        if (startDateField) {
+            startDateField.addEventListener('change', calculateEndDate);
+        }
+        if (durationDaysField) {
+            durationDaysField.addEventListener('input', calculateEndDate);
+        }
+        calculateEndDate();
         
-        if (startDateField && endDateField) {
-            startDateField.addEventListener('change', function() {
-                if (this.value) {
-                    const startDate = new Date(this.value);
-                    const endDate = new Date(startDate);
-                    // Add 1 year, then subtract 1 day (business rule)
-                    endDate.setFullYear(startDate.getFullYear() + 1);
-                    endDate.setDate(endDate.getDate() - 1);
-                    
-                    // Format as YYYY-MM-DD for date input
-                    const year = endDate.getFullYear();
-                    const month = String(endDate.getMonth() + 1).padStart(2, '0');
-                    const day = String(endDate.getDate()).padStart(2, '0');
-                    endDateField.value = `${year}-${month}-${day}`;
-                }
+        // Before form submission, ensure calculated end_date is available
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                calculateEndDate();
             });
         }
 
@@ -296,8 +424,15 @@
             q4Field.value = base + remainder;
         };
 
+        const shouldAutoSplitQuarterTargets = () => isGtContract;
+        const shouldAutoApplyQuarterPeriods = () => isGtContract || isDistributorContract;
+
         if (totalTargetField) {
-            totalTargetField.addEventListener('input', setQuarterTargets);
+            totalTargetField.addEventListener('input', () => {
+                if (shouldAutoSplitQuarterTargets()) {
+                    setQuarterTargets();
+                }
+            });
         }
 
         const addMonths = (date, months) => {
@@ -353,18 +488,44 @@
             q4PeriodField.value = `${formatDate(q4Start)} - ${formatDate(finalEnd)}`;
         };
 
-        if (totalTargetField) {
-            totalTargetField.addEventListener('input', setQuarterTargets);
+        if (totalTargetField && shouldAutoSplitQuarterTargets()) {
             setQuarterTargets();
         }
 
         if (startDateField) {
-            startDateField.addEventListener('change', setQuarterPeriods);
+            startDateField.addEventListener('change', () => {
+                if (shouldAutoApplyQuarterPeriods()) {
+                    setQuarterPeriods();
+                }
+            });
         }
         if (endDateField) {
-            endDateField.addEventListener('change', setQuarterPeriods);
+            endDateField.addEventListener('change', () => {
+                if (shouldAutoApplyQuarterPeriods()) {
+                    setQuarterPeriods();
+                }
+            });
         }
-        setQuarterPeriods();
+        if (shouldAutoApplyQuarterPeriods()) {
+            setQuarterPeriods();
+        }
+
+        if (isDistributorContract) {
+            const targetSchemaField = document.querySelector('[name="target_schema"]');
+            applyDistributorFieldMode();
+            if (targetSchemaField) {
+                targetSchemaField.addEventListener('change', () => {
+                    applyDistributorFieldMode();
+                    if (shouldAutoApplyQuarterPeriods()) {
+                        setQuarterPeriods();
+                    }
+                });
+            }
+        }
+
+        lockAutoManagedStructuredFields();
+        lockDistributorAutoManagedFields();
+        removeDeprecatedPaymentTermsField();
     });
 </script>
 {% endblock %}

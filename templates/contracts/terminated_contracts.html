@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load contract_filters %}
+
+{% block title %}{% trans "Terminated Contracts" %} - Legal CLM{% endblock %}
+{% block page_title %}{% trans "Terminated Contracts" %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between">
+            <h5 class="mb-0"><i class="bi bi-slash-circle text-danger"></i> {% trans "Terminated Contracts" %}</h5>
+            <a href="{% url 'contract_list' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> {% trans "All Contracts" %}
+            </a>
+        </div>
+        <div class="card-body">
+            {% if contracts %}
+            <div class="alert alert-secondary d-flex align-items-center gap-2">
+                <i class="bi bi-info-circle-fill"></i>
+                <span>
+                    <strong>{{ contracts.count }} contract{{ contracts.count|pluralize }}</strong>
+                    ha{{ contracts.count|pluralize:"s,ve" }} been terminated. These contracts are read-only.
+                </span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>{% trans "Title" %}</th>
+                            <th>{% trans "Type" %}</th>
+                            <th>{% trans "Party B" %}</th>
+                            <th>{% trans "End Date" %}</th>
+                            <th>{% trans "Last Updated" %}</th>
+                            <th>{% trans "Actions" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contract in contracts %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'contract_detail' contract.pk %}" class="fw-semibold text-decoration-none">
+                                    {{ contract.title }}
+                                </a>
+                            </td>
+                            <td>{{ contract.get_contract_type_display }}</td>
+                            <td>{{ contract.party_b }}</td>
+                            <td>
+                                {% if contract.end_date %}
+                                    {{ contract.end_date|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ contract.updated_at|date:"M d, Y" }}</td>
+                            <td>
+                                <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> {% trans "View" %}
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-slash-circle text-secondary" style="font-size: 3rem;"></i>
+                <h4 class="mt-3">{% trans "No terminated contracts" %}</h4>
+                <p class="text-muted">{% trans "No contracts have been terminated yet." %}</p>
+                <a href="{% url 'contract_list' %}" class="btn btn-outline-primary mt-2">
+                    <i class="bi bi-list-ul"></i> {% trans "View All Contracts" %}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

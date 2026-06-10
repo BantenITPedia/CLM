@@ -38,17 +38,15 @@ def contract_created_or_updated(sender, instance, created, **kwargs):
                 defaults={'role': 'OWNER'}
             )
         
-        # Auto-assign legal team members
-        try:
-            legal_group = Group.objects.get(name='Legal Team')
+        # Auto-assign legal members from both legacy and current RBAC groups.
+        legal_groups = Group.objects.filter(name__in=['CLM Legal', 'Legal Team'])
+        for legal_group in legal_groups:
             for user in legal_group.user_set.all():
                 ContractParticipant.objects.get_or_create(
                     contract=instance,
                     user=user,
                     defaults={'role': 'LEGAL'}
                 )
-        except Group.DoesNotExist:
-            pass  # Legal Team group doesn't exist yet
 
 
 @receiver(pre_save, sender=Contract)
@@ -105,3 +103,6 @@ def comment_added(sender, instance, created, **kwargs):
             user=instance.user,
             details=f"Comment added by {instance.user.get_full_name() or instance.user.username if instance.user else 'Unknown'}"
         )
+
+        # Notify active participants about the new comment
+        EmailService.send_comment_added_email(instance.contract, instance)

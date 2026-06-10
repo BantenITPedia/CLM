@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Create Contract" %} - {% trans "Step 3" %}{% endblock %}
+{% block page_title %}{% trans "Create Contract" %}{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">{% trans "Contract Wizard" %}</h6>
+                        <span class="badge bg-primary">{% trans "Step 3 of 4" %}</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar" role="progressbar" style="width: 75%;"></div>
+                    </div>
+                    <div class="row mt-3 text-center small text-muted">
+                        <div class="col text-success">{% trans "1. Entity Type" %}</div>
+                        <div class="col text-success">{% trans "2. Admin Docs" %}</div>
+                        <div class="col"><strong class="text-primary">{% trans "3. Contract Info" %}</strong></div>
+                        <div class="col">{% trans "4. Structured Data" %}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4">
+                    <h4 class="mb-1">{% trans "Fill Contract Details" %}</h4>
+                    <p class="text-muted mb-0">{% trans "Provide core contract information before final structured data submission." %}</p>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <strong>{% trans "Hint" %}:</strong> {% trans "Add complete party and date details to reduce legal revision cycles." %}
+                    </div>
+                    <div class="alert alert-primary mb-4">
+                        <strong>{% trans "Contract Period Rule" %}:</strong> {% blocktrans %}Select <strong>Start Date</strong> and fill <strong>Duration (days)</strong>. <strong>End Date</strong> is calculated automatically.{% endblocktrans %}
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="row">
+                            {% for field in form %}
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                    {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                {{ field }}
+                                {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                {% endif %}
+                                {% if field.help_text %}
+                                <small class="text-muted">{{ field.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="card mt-2 mb-3 border-0 bg-light">
+                            <div class="card-header bg-light">
+                                <strong>{% trans "Additional Documents (Optional)" %}</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-2 mb-2">
+                                    <div class="col-md-5">
+                                        <input type="text" name="additional_document_titles" class="form-control" placeholder="{% trans 'Document title' %}">
+                                    </div>
+                                    <div class="col-md-7">
+                                        <input type="file" name="additional_documents" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-5">
+                                        <input type="text" name="additional_document_titles" class="form-control" placeholder="{% trans 'Document title' %}">
+                                    </div>
+                                    <div class="col-md-7">
+                                        <input type="file" name="additional_documents" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'contract_wizard_step2' %}" class="btn btn-outline-secondary">{% trans "Back" %}</a>
+                            <div>
+                                <a href="{% url 'contract_wizard_cancel' %}" class="btn btn-outline-danger me-2">{% trans "Cancel" %}</a>
+                                <button type="submit" class="btn btn-primary px-4">{% trans "Continue" %}</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const startDateInput = document.getElementById('id_start_date');
+    const durationInput = document.getElementById('id_duration_days');
+    const endDateInput = document.getElementById('id_end_date');
+
+    if (!startDateInput || !durationInput || !endDateInput) {
+        return;
+    }
+
+    endDateInput.readOnly = true;
+
+    function toDate(value) {
+        const parts = value.split('-');
+        if (parts.length !== 3) return null;
+        const year = Number(parts[0]);
+        const month = Number(parts[1]) - 1;
+        const day = Number(parts[2]);
+        const date = new Date(year, month, day);
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+    }
+
+    function toYmd(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function recalculateEndDate() {
+        const startDate = toDate(startDateInput.value || '');
+        const duration = Number(durationInput.value || 0);
+
+        if (!startDate || !Number.isInteger(duration) || duration <= 0) {
+            endDateInput.value = '';
+            return;
+        }
+
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + duration);
+        endDateInput.value = toYmd(endDate);
+    }
+
+    startDateInput.addEventListener('change', recalculateEndDate);
+    durationInput.addEventListener('input', recalculateEndDate);
+    recalculateEndDate();
+});
+</script>
+{% endblock %}

@@ -10,7 +10,7 @@ This document provides comprehensive test cases to verify all system functionali
 - Access to http://localhost
 
 **Test User Accounts:**
-- Admin: `admin` / `admin123` (created automatically)
+- Admin: use your configured superuser account
 - Create additional test users via Django admin
 
 ---
@@ -20,8 +20,8 @@ This document provides comprehensive test cases to verify all system functionali
 ### Test Case 1.1: User Login
 **Steps:**
 1. Navigate to http://localhost
-2. Enter username: `admin`
-3. Enter password: `admin123`
+2. Enter your superuser username
+3. Enter your superuser password
 4. Click "Login"
 
 **Expected Result:**
@@ -55,7 +55,7 @@ This document provides comprehensive test cases to verify all system functionali
 
 ### Test Case 2.1: Create Basic Contract
 **Steps:**
-1. Login as admin
+1. Login as superuser
 2. Click "Create Contract" in sidebar
 3. Fill in form:
    - Title: "Test NDA Agreement"

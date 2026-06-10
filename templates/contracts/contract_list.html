@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load contract_filters %}
 
-{% block title %}Contracts - Legal CLM{% endblock %}
-{% block page_title %}All Contracts{% endblock %}
+{% block title %}{% trans "Contracts" %} - Legal CLM{% endblock %}
+{% block page_title %}{% trans "All Contracts" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="card">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-file-text"></i> All Contracts</h5>
+            <h5 class="mb-0"><i class="bi bi-file-text"></i> {% trans "All Contracts" %}</h5>
             <a href="{% url 'contract_create' %}" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i> Create New
+                <i class="bi bi-plus-circle"></i> {% trans "Create New" %}
             </a>
         </div>
         <div class="card-body">
@@ -34,7 +35,7 @@
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-search"></i> Filter
+                            <i class="bi bi-search"></i> {% trans "Filter" %}
                         </button>
                     </div>
                 </div>
@@ -44,7 +45,7 @@
                     </div>
                     <div class="col-md-2">
                         <a href="{% url 'contract_list' %}" class="btn btn-secondary w-100">
-                            <i class="bi bi-x-circle"></i> Clear
+                            <i class="bi bi-x-circle"></i> {% trans "Clear" %}
                         </a>
                     </div>
                 </div>
@@ -55,15 +56,15 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Title</th>
-                            <th>Type</th>
-                            <th>Party B</th>
-                            <th>Status</th>
-                            <th>Start Date</th>
-                            <th>End Date</th>
-                            <th>Days to Expiry</th>
-                            <th>Owner</th>
-                            <th>Actions</th>
+                            <th>{% trans "Title" %}</th>
+                            <th>{% trans "Type" %}</th>
+                            <th>{% trans "Party B" %}</th>
+                            <th>{% trans "Status" %}</th>
+                            <th>{% trans "Start Date" %}</th>
+                            <th>{% trans "End Date" %}</th>
+                            <th>{% trans "Days to Expiry" %}</th>
+                            <th>{% trans "Owner" %}</th>
+                            <th>{% trans "Actions" %}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -78,7 +79,7 @@
                             <td>{{ contract.party_b }}</td>
                             <td>
                                 <span class="badge bg-{% if contract.status == 'ACTIVE' %}success{% elif contract.status == 'EXPIRED' %}danger{% elif contract.status == 'EXPIRING_SOON' %}warning{% else %}secondary{% endif %}">
-                                    {{ contract.get_status_display }}
+                                    {% if contract.status == 'SUBMITTED' %}{% trans "Legal Review" %}{% else %}{{ contract.get_status_display }}{% endif %}
                                 </span>
                             </td>
                             <td>{{ contract.start_date|date:"M d, Y"|default:"-" }}</td>
@@ -87,23 +88,29 @@
                                 {% if contract.days_until_expiry %}
                                     {% if contract.days_until_expiry > 0 %}
                                         <span class="text-{% if contract.days_until_expiry <= 30 %}danger{% elif contract.days_until_expiry <= 60 %}warning{% else %}success{% endif %}">
-                                            {{ contract.days_until_expiry }} days
+                                            {% blocktrans with days=contract.days_until_expiry %}{{ days }} days{% endblocktrans %}
                                         </span>
                                     {% else %}
-                                        <span class="text-danger">Expired</span>
+                                        <span class="text-danger">{% trans "Expired" %}</span>
                                     {% endif %}
                                 {% else %}
                                     -
                                 {% endif %}
                             </td>
-                            <td>{{ contract.owner.get_full_name|default:contract.owner.username }}</td>
                             <td>
-                                <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-sm btn-outline-primary" title="View">
+                                {% if contract.owner %}
+                                    {% if contract.owner.get_full_name %}{{ contract.owner.get_full_name }}{% else %}{{ contract.owner.username }}{% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-sm btn-outline-primary" title="{% trans 'View' %}">
                                     <i class="bi bi-eye"></i>
                                 </a>
                                 {% has_contract_permission user contract 'edit_contract' as can_edit %}
                                 {% if can_edit %}
-                                <a href="{% url 'contract_edit' contract.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                <a href="{% url 'contract_edit' contract.pk %}" class="btn btn-sm btn-outline-secondary" title="{% trans 'Edit' %}">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 {% endif %}
@@ -112,7 +119,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="9" class="text-center text-muted py-4">
-                                No contracts found. <a href="{% url 'contract_create' %}">Create your first contract</a>
+                                {% trans "No contracts found." %} <a href="{% url 'contract_create' %}">{% trans "Create your first contract" %}</a>
                             </td>
                         </tr>
                         {% endfor %}

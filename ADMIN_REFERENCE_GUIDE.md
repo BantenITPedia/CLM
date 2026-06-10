@@ -1,7 +1,7 @@
 # Admin Reference Guide - All Models & Configuration
 
 ## Quick Access
-Admin Panel: http://localhost/admin/ (admin/admin123)
+Admin Panel: http://localhost/admin/
 
 ---
 

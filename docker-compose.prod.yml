@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   db:
     image: postgres:15-alpine
@@ -8,7 +7,7 @@ services:
       POSTGRES_USER: clm_user
       POSTGRES_PASSWORD: ClmSecure2026Pass!
     volumes:
-    - clm_postgres_data:/var/lib/postgresql/data
+    - clm_clm_postgres_data:/var/lib/postgresql/data
     networks:
     - clm
     restart: always
@@ -42,11 +41,20 @@ services:
     - clm
     env_file:
     - .env.prod
+    environment:
+      RUN_MIGRATIONS: "1"
+      RUN_COLLECTSTATIC: "1"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5).getcode()==200 else 1)\""]
+      interval: 15s
+      timeout: 7s
+      retries: 5
+      start_period: 20s
     restart: always
   celery_worker:
     build:
@@ -59,8 +67,12 @@ services:
     networks:
     - clm
     depends_on:
-    - db
-    - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
     restart: always
   celery_beat:
     build:
@@ -73,8 +85,12 @@ services:
     networks:
     - clm
     depends_on:
-    - db
-    - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
     restart: always
   nginx:
     image: nginx:alpine
@@ -90,10 +106,18 @@ services:
     networks:
     - clm
     depends_on:
-    - web
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: always
 volumes:
-  clm_postgres_data: null
+  clm_clm_postgres_data:
+    external: true
   clm_static_volume: null
   clm_media_volume: null
 networks:

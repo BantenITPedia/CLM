@@ -259,7 +259,7 @@ Pihak Pertama dan Pihak Kedua selanjutnya secara bersama-sama disebut
 
 <!-- LAMPIRAN A -->
 <div class="page-break"></div>
-<h2 style="text-align: center;">Lampiran A<br>Syarat dan Ketentuan<br>Nomor. 14._______/PCI/SALES/_____/202____</h2>
+<h2 style="text-align: center;">Lampiran A<br>Syarat dan Ketentuan<br>Nomor. {{ contract_number }}</h2>
 
 <table>
 <tr>
@@ -281,15 +281,14 @@ Pihak Pertama dan Pihak Kedua selanjutnya secara bersama-sama disebut
 <tr>
   <td><strong>Jenis Produk</strong><br><em>Product</em></td>
   <td>
-    Quarter (Triwulan) and Yearly (Tahunan): MEO, LUV CARE, NOVA dan produk-produk yang <u>akan dirilis selanjutnya</u>.<br><br>
-    Yearly only (Tahunan saja): CAT CHOIZE, DOG CHOIZE, CHEF CHOIZE, CUTIEZ, SANTAP, LEZATO, A-PRO, <u>pasir kucing merek</u> CAT COMFY dan produk-produk yang <u>akan dirilis selanjutnya</u>.
+    {{ product_scope_text|safe }}
   </td>
 </tr>
 </table>
 
 <!-- LAMPIRAN B -->
 <div class="page-break"></div>
-<h2 style="text-align: center;">Lampiran B<br>Target Sales / <em>Sales Target</em><br>Nomor. <u>dikosongan</u></h2>
+<h2 style="text-align: center;">Lampiran B<br>Target Sales / <em>Sales Target</em><br>Nomor. {{ contract_number }}</h2>
 
 <table style="width: 60%; margin: 20px auto;">
 <tr>
@@ -323,70 +322,8 @@ Pihak Pertama dan Pihak Kedua selanjutnya secara bersama-sama disebut
 
 <!-- LAMPIRAN C -->
 <div class="page-break"></div>
-<h2 style="text-align: center;">Lampiran C<br>Skema Insentif/Incentive Scheme<br>Nomor. 14.________/PCI/SALES/_____/202____</h2>
-
-<table style="margin: 20px auto; border-collapse: collapse;">
-<tr style="background-color: #cccccc;">
-  <th rowspan="2" style="border: 1px solid black; padding: 8px; text-align: center;">Description</th>
-  <th colspan="3" style="border: 1px solid black; padding: 8px; text-align: center;">PCI Existing Incentive Scheme<br>All <u>number</u> in D1, D2 and D3 <u>is</u> in Billion<br>Purchase Reward</th>
-</tr>
-<tr style="background-color: #cccccc;">
-  <th style="border: 1px solid black; padding: 8px;">D1<br>(9,750)</th>
-  <th style="border: 1px solid black; padding: 8px;">D2<br>(4,875)</th>
-  <th style="border: 1px solid black; padding: 8px;">D3<br>(1,950)</th>
-</tr>
-<tr>
-  <td colspan="4" style="border: 1px solid black; padding: 8px;"><strong>Yearly/Tahunan / Non Commodity Products</strong></td>
-</tr>
-<tr>
-  <td style="border: 1px solid black; padding: 8px;">– 100% achievement</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">3.5%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">2.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">1.0%</td>
-</tr>
-<tr>
-  <td style="border: 1px solid black; padding: 8px;">– 110% achievement</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">4.5%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">3.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">2.0%</td>
-</tr>
-<tr>
-  <td style="border: 1px solid black; padding: 8px;">– 120% achievement</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">5.5%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">4.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">3.0%</td>
-</tr>
-<tr>
-  <td colspan="4" style="border: 1px solid black; padding: 8px;"><strong>Quarterly/Perempat / Non Commodity Products</strong></td>
-</tr>
-<tr>
-  <td style="border: 1px solid black; padding: 8px;">– 100% achievement</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">2.5%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">2.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">1.0%</td>
-</tr>
-<tr>
-  <td style="border: 1px solid black; padding: 8px;">– 110% achievement</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">3.5%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">3.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">2.0%</td>
-</tr>
-<tr>
-  <td style="border: 1px solid black; padding: 8px;">– 120% achievement</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">4.5%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">4.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">3.0%</td>
-</tr>
-<tr>
-  <td colspan="4" style="border: 1px solid black; padding: 8px;"><strong>Yearly/Tahunan / Commodity Products Only</strong></td>
-</tr>
-<tr>
-  <td style="border: 1px solid black; padding: 8px;"></td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">4.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">4.0%</td>
-  <td style="border: 1px solid black; padding: 8px; text-align: center;">4.0%</td>
-</tr>
-</table>
+<h2 style="text-align: center;">Lampiran C<br>Skema Insentif/Incentive Scheme<br>Nomor. {{ contract_number }}</h2>
+{{ incentive_scheme_text|safe }}
 
 <div style="border: 1px solid black; padding: 10px; margin: 20px 0;">
 <p><strong>Keterangan/Note:</strong></p>

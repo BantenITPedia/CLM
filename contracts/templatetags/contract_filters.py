@@ -1,6 +1,7 @@
 from django import template
 from django.contrib.humanize.templatetags.humanize import intcomma
 import re
+from decimal import Decimal, InvalidOperation
 from contracts import permissions
 
 register = template.Library()
@@ -93,6 +94,50 @@ def format_number(value, field_name=''):
     return intcomma(int(normalized))
 
 
+@register.filter(name='format_idr')
+def format_idr(value):
+    """Format number as Indonesian Rupiah, e.g. Rp 1.250.000."""
+    if value is None:
+        return '-'
+
+    text = str(value).strip()
+    if not text:
+        return '-'
+
+    cleaned = re.sub(r'(?i)\b(rp|idr)\b', '', text)
+    cleaned = re.sub(r'\s+', '', cleaned)
+
+    if not cleaned:
+        return '-'
+
+    normalized = cleaned
+
+    if ',' in normalized and '.' in normalized:
+        if normalized.rfind(',') > normalized.rfind('.'):
+            normalized = normalized.replace('.', '').replace(',', '.')
+        else:
+            normalized = normalized.replace(',', '')
+    elif ',' in normalized:
+        normalized = normalized.replace('.', '').replace(',', '.')
+    else:
+        dot_parts = normalized.split('.')
+        if len(dot_parts) > 1 and all(part.isdigit() for part in dot_parts):
+            if all(len(part) == 3 for part in dot_parts[1:]):
+                normalized = ''.join(dot_parts)
+
+    try:
+        amount = int(Decimal(normalized))
+    except (InvalidOperation, ValueError):
+        return value
+
+    return f"Rp {intcomma(amount).replace(',', '.')}"
+
+
 @register.simple_tag(name='has_contract_permission')
 def has_contract_permission(user, contract, permission):
     return permissions.has_contract_permission(user, contract, permission)
+
+
+@register.simple_tag(name='can_delete_contract')
+def can_delete_contract(user, contract):
+    return permissions.can_delete_contract(user, contract)

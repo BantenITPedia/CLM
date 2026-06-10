@@ -1,0 +1,502 @@
+{% load contract_filters %}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<style>
+        @page {
+            size: A4;
+            margin: 2.5cm 2cm;
+        }
+        body {
+            font-family: "Times New Roman", serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            margin: 0;
+        }
+        h1, h2, h3 {
+            text-align: center;
+            font-weight: bold;
+        }
+        h1 {
+            margin: 22px 0 14px;
+            line-height: 1.25;
+        }
+        .center { text-align: center; }
+        .section-title {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #000;
+        }
+        th, td {
+            padding: 6px;
+            vertical-align: top;
+        }
+        .signature {
+            border-collapse: collapse;
+            width: 100%;
+            border: 1px solid #000;
+        }
+        .signature td {
+            text-align: center;
+            padding: 10px;
+            vertical-align: top;
+            border-top: none;
+            border-bottom: none;
+        }
+        .signature td:first-child {
+            border-right: none;
+        }
+        .signature td:last-child {
+            border-left: none;
+        }
+        .signature-stamp {
+            height: 50px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9pt;
+            color: #999;
+        }
+        .signature-label {
+            font-weight: bold;
+            font-size: 11pt;
+            margin-bottom: 5px;
+        }
+        .signature-company {
+            padding: 8px 12px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .signature-space {
+            height: 120px;
+            margin-bottom: 15px;
+        }
+        .signature-name {
+            font-weight: bold;
+            margin-bottom: 2px;
+            font-size: 13pt;
+        }
+        .signature-title {
+            font-style: italic;
+            font-size: 11pt;
+            color: #333;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        ol, ul {
+            margin-top: 0;
+            margin-bottom: 0;
+            padding-left: 28px;
+        }
+        p {
+            margin: 0 0 8px 0;
+            text-align: justify;
+        }
+        /* Force top heading block to match GT centered composition */
+        body > p:nth-of-type(1),
+        body > p:nth-of-type(2),
+        body > p:nth-of-type(3),
+        body > p:nth-of-type(4),
+        body > p:nth-of-type(5),
+        body > p:nth-of-type(6) {
+            text-align: center;
+            font-weight: bold;
+        }
+</style>
+</head>
+<body>
+<p>
+<strong>PERJANJIAN KERJA SAMA KEAGENAN</strong>
+</p>
+<p>
+<strong>ANTARA</strong>
+</p>
+<p>
+<strong>PT PERFECT COMPANION INDONESIA</strong>
+</p>
+<p>
+<strong>	DENGAN		</strong>
+</p>
+<p>
+<strong>{{ party_b_legal_name }}</strong>
+</p>
+<p>
+<strong>Nomor. <em>{{ contract_number }}</em>
+</strong>
+</p>
+<p>Perjanjian Kerja Sama Keagenan (untuk selanjutnya disebut “<strong>Perjanjian</strong>”) dibuat pada {{ contract_signing_date }}  oleh dan antara:</p>
+<ol>
+<li>
+<strong>PT Perfect Companion Indonesia,</strong> beralamat di Wisma 77 Lantai 18, Jalan Letjen S Parman, Slipi, Jakarta Barat, DKI Jakarta – Indonesia, dalam hal ini diwakili oleh <strong>Handoko Tingsantoso</strong>, dalam kedudukannya selaku <strong>Direktur Utama</strong> dari dan karenanya bertindak untuk dan atas nama PT Perfect Companion Indonesia, yang selanjutnya disebut sebagai “<strong>Pihak Pertama”</strong>.</li>
+<li>
+<strong>
+<em>{{ party_b_legal_name }}</em>
+</strong>, beralamat di <strong>
+<em>{{ party_b_registered_address }} </em>
+</strong>dalam hal ini diwakili oleh <strong>
+<em>{{ party_b_authorized_representative_name }}</em>
+</strong>, dalam kedudukannya selaku <strong>
+<em>{{ party_b_authorized_representative_title }}</em>
+</strong>, dari dan karenanya bertindak untuk dan atas nama PT.B yang selanjutnya disebut sebagai <strong>“Pihak Kedua”</strong>; </li>
+</ol>
+<p>
+<strong>Pihak Pertama </strong>dan <strong>Pihak Kedua</strong>, selanjutnya secara bersama-sama disebut “<strong>Para Pihak</strong>” dan masing-masing disebut sebagai “<strong>Pihak</strong>”, dalam kedudukan tersebut di atas terlebih dahulu menerangkan hal-hal sebagai berikut:</p>
+<ol>
+<li>
+<strong>Pihak Pertama </strong>adalah badan hukum perseroan terbatas yang didirikan berdasarkan hukum Negara Republik Indonesia, yang bergerak dalam bidang penjualan dan distribusi makanan hewan kesayangan dengan merek yang dimiliki oleh Pihak Kedua.</li>
+<li>
+<strong>Pihak Kedua </strong>adalah {{ business_form }} yang didirikan berdasarkan hukum Republik Indonesia, yang bergerak dalam bidang <strong>penjualan makanan hewan</strong>;</li>
+<li>
+<strong>Pihak Pertama </strong>bermaksud untuk menyediakan dan menjual produk berupa sebagaimana yang terlampir pada Lampiran yang dimiliki oleh Pihak Pertama (“<strong>Produk</strong>”) untuk dijual kembali melalui tempat<em> </em>penjualan yang dimiliki dan dikelola oleh Pihak Kedua<strong> </strong>(sebagaimana disebutkan di atas)<strong> </strong>(<em>“</em>
+<strong>
+<em>Tempat Pihak Kedua</em>
+</strong>”) </li>
+</ol>
+<p>Selanjutnya, berdasarkan hal-hal yang telah diuraikan di atas, Para Pihak<strong> </strong>menyatakan setuju dan sepakat mengikatkan diri satu dengan yang lainnya, untuk membuat, menandatangani dan melaksanakan Perjanjian ini, dengan ketentuan dan syarat-syarat sebagai berikut:</p>
+<h1>PASAL 1</h1>
+<h1>DEFINISI</h1>
+<ol>
+<li>Kecuali disebutkan secara tegas di dalam Perjanjian ini, istilah-istilah di bawah ini memiliki arti dan maksud sebagai berikut:
+<ul>
+<li>
+<strong>Sistem Penjualan </strong>adalah sebagaimana disebutkan pada Pasal 2 Ayat 1 Perjanjian ini<em>.</em>
+</li>
+<li>
+<strong>Hak Kekayaan Intelektual</strong> adalah segala informasi, data, ide, penemuan, inovasi, hasil kerja seni, desain, merek, merek dagang, merek layanan, slogan, dan hal lainnya yang mempunyai perlindungan hukum atau mempunyai hak secara hukum termasuk hak yang dilindungi di Indonesia atau hukum asing.
+</li>
+<li>
+<strong>Hari Kerja</strong> adalah hari Senin sampai dengan Sabtu, kecuali hari libur nasional yang ditetapkan oleh Pemerintah di wilayah Republik Indonesia.
+</li>
+</ul>
+</li>
+<li>Judul-judul pasal atau ayat yang dipergunakan di dalam Perjanjian ini hanya untuk memberi kemudahan referensi saja dan tidak mempengaruhi pengertian dari ketentuan yang bersangkutan.</li>
+</ol>
+<h1>PASAL 2</h1>
+<h1>RUANG LINGKUP KERJA SAMA DAN WILAYAH OPERASIONAL</h1>
+<ol>
+<li>Pihak Pertama<strong> </strong>dengan ini memberikan persetujuan dengan syarat dan ketentuan sebagaimana diatur di dalam Perjanjian ini serta dalam Lampiran kepada Pihak Kedua untuk melakukan tindakan penjualan Produk melalui tempat penjualan milik Pihak Kedua sebagaimana disebutkan dalam Lampiran, untuk selanjutnya disebut sebagai “<strong>Sistem Penjualan</strong>”. </li>
+<li>Selama Perjanjian ini berlangsung, Pihak Pertama menunjuk Pihak Kedua untuk menjadi distributor Non-eksklusif dari Pihak Pertama yang berkeajiban menjual dan mendistribusikan produk-produk Pihak pertama ke channel “<strong>GT Retail</strong>” sesuai dengan jenis dan target kuantiti yang telah ditentukan dalam wilayah <strong>{{ wilayah_operasional|default:'-' }}</strong>
+</li>
+<li>Pihak Kedua sepakat untuk tidak melanggar wilayah operasional seperti yang telah disebutkan pada ayat (2) diatas dan apabila ditemukan dilakukannya pelanggaran yang dilakukan oleh Pihak Kedua  akan dikenakan sangsi berupa pemutusan hubungan kerjasama.</li>
+<li>Pihak Kedua setuju bahwa Pihak Pertama dapat merubah Sebagian atau seluruh produk, wilayah dan outlets, apabila menurut kebijakan Pihak Pertama hal tersebut dibutuhkan, dan perusahaan akan memberikan pemberitahuan secara tertulis kepada Pihak Kedua dalam 30 (Tiga Puluh) hari kalender sebelum melakukan perubahan sebagian atau seluruh produk, wilayah, outlets.</li>
+<li>Dalam hal terjadinya perubahan kebijakan yang dilakukan oleh Pihak Pertama sebagaimana disebutkan dalam poin (4), maka Pihak pertama tidak mempunyai kewajiban untuk memberikan kompensasi kepada Pihak kedua sebagai akibat dari perubahan yang dilakukan oleh Pihak Pertama.</li>
+</ol>
+<h1>PASAL 3</h1>
+<h1>HARGA, ORDER, LEVEL STOCK, PENGIRIMAN DAN PEMBAYARAN</h1>
+<ol>
+<li>Pihak Pertama memberikan daftar harga dari Pihak Kedua kepada outlets dan konsumen. Pihak Kedua diharuskan untuk mengikuti daftar harga yang disediakan oleh Pihak Pertama dan Pihak Kedua tidak diperbolehkan untuk melakukan perubahan pada harga produk yang didistribusikan tanpa adanya ijin/atau konfirmasi dari Pihak Pertama.</li>
+<li>Pihak Kedua diwajibkan untuk menjaga dan memiliki stok yang cukup untuk di distribusikan kepada “<strong>GT Retail</strong>” ke wilayah yang telah ditentukan. Pihak Kedua harus melaporkan posisi stok secara akurat setiap 2 (dua) minggu sekali, laporan bisa dilakukan melalui sms, e-mail, atau fax. Berdasarkan laporan tersebut maka Pihak Pertama akan menjaga ketersediaan stok yang memadai untuk memenuhi order yang dimiliki oleh Pihak kedua dan mengisi Kembali ketersediaan barang yang ada di <strong>“GT Retail</strong>”</li>
+<li>Pihak Kedua sepakat untuk selalu menjaga stok level sebesar 7 (tujuh) hari dari rencana penjualan per bulan sesuai dengan kesepakatan Para Pihak. Pengiriman barang yang dilakukan oleh Pihak Pertama baik dari Thailand atau dari Gudang Pihak Pertama di Jakarta.</li>
+<li>Pihak Pertama akan mengirim produk dengan pembayaran secara Cash atau Kredit kepada Pihak Kedua sampai dengan batas jumlah nilai kredit yang dimiliki oleh Pihak Kedua. Pembayaran dilakukan pihak kedua dalam jangka waktu paling lama dalam 30 (tiga puluh) hari kalender sejak faktur dan invoice tagihan diterima oleh Pihak Kedua.</li>
+<li>Pihak Kedua diwajibkan menerbitkan <strong>Bank Garansi</strong> bila pembelian secara Kredit yang disesuaikan dengan batas kredit yang diberikan Pihak Pertama kepada Pihak kedua berdasarkan kesepakatan Para Pihak.</li>
+<li>Atas permintaan Pihak Pertama, Pihak Kedua harus memberikan potongan harga sementara kepada para pelanggan yang akan dibayar Kembali oleh Pihak Pertama kepada Pihak kedua sebesar potongan harga sementara yang telah diberikan dengan memberikan faktur yang bersangkutan kepada Pihak Pertama.</li>
+</ol>
+<h1>PASAL 4</h1>
+<h1>SARANA OPERASIONAL DAN BIAYA - BIAYA</h1>
+<p>Pihak Kedua sepakat untuk untuk menyediakan Gudang sesuai dengan standard dan Pihak Pertama serta tidak mengelompokkan atau mencampur dengan barang yang bisa menimbulkan kontaminasi, dengan maksud untuk menjaga kualitas produk tetap terjaga sampai ke tempat pelanggan.</p>
+<h1>PASAL 5</h1>
+<h1>UKURAN KEBERHASILAN DAN KOMISI PIHAK KEDUA</h1>
+<ol>
+<li>Dengan telah ditunjukknya Pihak Kedua sebagai mitra dari Pihak Pertama, maka Pihak Kedua sepakat untuk melakukan penjualan sebaik mungkin untuk mencapai target yang meliputi : volume penjualan, stok level dan pembayaran tepat waktu.</li>
+<li>Berdasarkan kebijakan Pihak Pertama, Pihak Kedua bisa mendapatkan potongan  harga <em>(Discount), </em>apabila mencapai standard yang telah ditentukan berdasarkan pada penjualan yang dicapai oleh Pihak Kedua (terlampir)</li>
+</ol>
+<h1>PASAL 6</h1>
+<h1>JANGKA WAKTU</h1>
+<ol>
+<li>Perjanjian ini mulai berlaku efektif mengikat Para Pihak, terhitung sejak tanggal <strong>{{ contract_start_date }}</strong>, sampai dengan <strong>{{ contract_end_date }}</strong> atau diakhiri lebih awal oleh Para Pihak sesuai dengan ketentuan Pasal 8 ayat (2) dan ayat (3) (untuk selanjutnya disebut dengan “<strong>Jangka Waktu Perjanjian</strong>”).  </li>
+<li>Jangka Waktu Perjanjian sebagaimana disebutkan pada ayat (1) Pasal ini dapat diperpanjang dengan kesepakatan <strong>Para Pihak</strong>, yang akan dituangkan dalam suatu amandemen/ adendum tertulis atas Perjanjian ini, sekurang-kurangnya 7 (tujuh) hari sebelum Jangka Waktu Perjanjian berakhir.</li>
+</ol>
+<h1>PASAL 7</h1>
+<h1>EVALUASI</h1>
+<p>Para Pihak sepakat untuk melakukan evaluasi terhadap Perjanjian ini setiap triwulan selama Jangka Waktu Perjanjian di mana hasil evaluasi tersebut dapat digunakan oleh Para Pihak untuk meningkatkan kerja sama ini dan melihat efektivitas kerja sama di antara Para Pihak<strong> </strong>berdasarkan Perjanjian ini.</p>
+<h1>PASAL 8</h1>
+<h1>PENGAKHIRAN PERJANJIAN</h1>
+<ol>
+<li>Pihak Pertama berhak memutuskan hubungan Kerjasama sebagaimana  dimaksud dalam Perjanjian ini bilamana Pihak Kedua:</li>
+</ol>
+<ul>
+<li>Tidak memenuhi ketentuan – ketentuan yang tertera dalam perjanjian ini.</li>
+<li>Tidak dapat memenuhi permintaan <em>(demand)</em> pasar dalam kurun waktu selama 1 (satu) bulan.</li>
+</ul>
+<ol>
+<li>Dalam dilakukannya pengakhiran Perjanjian dilakukan Pihak Pertama akan memberitahukan secara tertulis dalam 14 (empat belas) hari kalender sebelum tanggal pengakhiran perjanjian.</li>
+<li>Dalam hal dilakukannya pengakhiran Perjanjian lebih awal segala kewajiban yang telah timbul akibat Perjanjian ini diantara Para pihak sebelum tanggal berakhirnya Perjanjian maka akan tetap berlaku dan mengikat Para Pihak sampai dengan selesai. </li>
+<li>Untuk tujuan pengakhiran Perjanjian ini, maka Para Pihak bersepakat untuk mengesampingkan berlakunya ketentuan Pasal 1266 Kitab Undang-Undang Hukum Perdata Indonesia, sepanjang mengenai diperlukannya keputusan pengadilan untuk pengakhiran Perjanjian ini, sehingga pemutusan dengan alasan sebagaimana diatur Pasal ini secara sah cukup dilakukan melalui pemberitahuan tertulis dari Para Pihak.</li>
+</ol>
+<p>  </p>
+<h1>PASAL 9</h1>
+<h1>HAK KEKAYAAN INTELEKTUAL</h1>
+<ol>
+<li>Pihak Kedua dilarang untuk meniru, memperbanyak, mengakibatkan perubahan, pemblokiran, penambahan, perubahan dan/atau perlakuan yang sama lainnya terhadap Hak Kekayaan Intelektual Pihak lainnya, kecuali dengan persetujuan Pihak Pertama.</li>
+<li>Untuk menghindari keragu-raguan, seluruh materi yang terdapat dalam Produk merupakan Hak Kekayaan Intelektual yang (1) dimiliki oleh Pihak Pertama; atau (2) Pihak Pertama memiliki hak untuk mendistribusikannya dan/atau menjualnya.</li>
+<li>Bilamana Pihak Kedua melanggar ketentuan sebagaimana dimaksud dalam Pasal ini yang mengakibatkan kerugian bagi Pihak Pertama dalam Perjanjian ini, maka Pihak Kedua berkewajiban memberikan ganti kerugian kepada Pihak Pertama dan apabila dapat dibuktikan bahwa pelanggaran tersebut menyebabkan adanya Pihak Ketiga yang menggunakan Hak Kekayaan Intelektual Pihak Pertama, maka hal tersebut menjadi tanggung jawab Pihak Kedua secara sepenuhnya yang dimana termasuk perlawanan, tuntutan, ganti rugi dan kerugian-kerugian yang dialami oleh Pihak Pertama.</li>
+</ol>
+<h1>PASAL 10</h1>
+<h1>PERLINDUNGAN HUKUM DAN BATASAN TANGGUNG JAWAB</h1>
+<p>Masing-masing<strong> </strong>Pihak wajib memberi perlindungan hukum dan mengganti rugi kepada Pihak lainnya, atas suatu tuntutan maupun kerugian yang timbul dari atau berkaitan dengan tindakan (atau tidak dilaksanakannya suatu tindakan), kesalahan atau pelanggaran terhadap kewajiban dan jaminan oleh Pihak yang bersangkutan atau direktur, karyawan dan/ atau subkontraktornya terhadap jaminan atau kewajibannya dalam Perjanjian ini.</p>
+<h1>PASAL 11</h1>
+<h1>PERNYATAAN DAN JAMINAN</h1>
+<p>Masing-masing Pihak dengan ini menyatakan dan menjamin kepada Pihak lainnya hal-hal sebagai berikut:</p>
+<ol>
+<li>Pihaknya adalah suatu badan hukum yang didirikan dan tunduk pada hukum Negara Republik Indonesia.</li>
+<li>Pejabat yang menandatangani Perjanjian ini adalah orang yang berhak dan berwenang mewakili dan bertindak untuk dan atas nama Pihak yang diwakilinya dan telah mendapatkan seluruh ijin dan persetujuan yang diperlukan guna menandatangani Perjanjian ini.</li>
+<li>Penandatanganan dan pelaksanaan Perjanjian ini tidak bertentangan atau tidak akan mengakibatkan Pihaknya dalam keadaan wanprestasi atau ingkar janji berdasarkan perjanjian-perjanjian dimana Pihaknya merupakan pihak dalam perjanjian tersebut.</li>
+<li>Para Pihak menjamin telah memiliki seluruh ijin dan persetujuan yang diperlukan dari pihak yang berwenang untuk melakukan kegiatan usahanya serta membebaskan Pihak lainnya dari segala tuntutan dari pihak manapun termasuk pemerintah yang berwenang atas pelaksanaan kegiatan usahanya.</li>
+</ol>
+<h1>PASAL 12</h1>
+<h1>HUKUM YANG BERLAKU DAN PENYELESAIAN PERSELISIHAN</h1>
+<ol>
+<li>Perjanjian ini tunduk pada dan harus ditafsirkan berdasarkan dengan Hukum Negara Republik Indonesia.</li>
+<li>Apabila dalam pelaksanaan Perjanjian ini timbul perselisihan atau sengketa (<strong>“Perselisihan</strong>”), maka Para Pihak sepakat untuk menyelesaikannya secara musyawarah untuk mufakat dalam jangka waktu selama-lamanya 30 (tiga puluh) Hari Kerja sejak Perselisihan tersebut timbul.</li>
+<li>Jika ternyata dalam jangka waktu 30 (tiga puluh) Hari Kerja sebagaimana dijelaskan pada ayat (2) Pasal ini, Para Pihak masih belum berhasil mencapai kesepakatan atas Perselisihan yang timbul, maka Para Pihak sepakat bahwa Perselisihan tersebut akan diajukan ke Pengadilan Negeri Jakarta Barat.</li>
+<li>Sebelum ada keputusan yang berkekuatan hukum tetap dari Pengadilan, selama proses penyelesaian Perselisihan, Para Pihak tetap wajib melaksanakan masing-masing kewajibannya menurut Perjanjian ini.</li>
+</ol>
+<h1>PASAL 13</h1>
+<h1>KEBIJAKAN RETUR</h1>
+<ol>
+<li>Untuk membina dan menjaga nama baik Pihak Pertama dan Produk yang didistribusikan oleh Pihak Kedua di dalam Wilayah Distribusi, maka Pihak Pertama akan meminta Pihak Kedua, untuk menarik seluruh Produk baik dari <em>Channel</em> maupun dari Gudang Pihak Kedua dalam hal:</li>
+<li>Terjadi kadaluarsa dan <em>bad stock</em>/rusak di Toko/Outlet; (tidak berlaku untuk produk di gudang Pihak kedua) </li>
+<li>Retur produk hanya dari Toko/outlet;</li>
+<li>Terdapat kerusakan kualitas dan/atau cacat produksi; 	</li>
+<li>Terjadi kerusakan pada saat pengiriman Produk yang ditentukan pada saat terima barang di Gudang Pihak Kedua; atau</li>
+<li>Pemutusan atau berakhirnya Jangka Waktu Perjanjian .</li>
+<li>Dalam hal terjadi salah satu kondisi yang dimaksud dalam ayat (1) Pasal ini Pihak Kedua akan memberikan data stock berdasarkan Expired date ke Pihak Pertama sehubungan dengan produk yang akan kadaluarsa paling lambat 90 (sembilan puluh hari) sebelum tanggal kadaluarsa lalu Pihak Kedua akan memberikan dokumen pendukung kepada Pihak Pertama dalam hal Pihak Kedua bermaksud untuk mengajukan Retur Produk dari Channel/Outlet.</li>
+<li>Dalam hal terjadinya pengakhiran kerjasama atau berakhirnya jangka waktu Perjanjian yang dimaksud dalam ayat (1e) kebijakan retur barang hanya berlaku untuk stok barang dengan katergori baik (dengan tanggal kadaluarsa lebih dari 90 hari sebeum tanggal kadaluarsa)</li>
+<li>Dalam hal Pihak Pertama menarik Produk dengan alasan perubahan <em>design</em> dan atau komposisi, Pihak Kedua berhak atas penggantian Produk baru yang sejenis sesuai dengan jumlah (unit) Produk yang ditarik atau dikembalikan, dengan menggunakan harga perolehan distributor yang berlaku pada saat penarikan dan seluruh biaya berkaitan dengan penarikan Produk tersebut menjadi tanggung jawab Pihak Pertama.</li>
+<li>Pihak Pertama setuju mengganti kerusakan/kehilangan Produk akibat kelalaian pihak pengangkutan selama kerusakan/kehilangan tersebut dicantumkan dalam dokumen pengiriman barang (<em>delivery note</em>) yang ditandatangani oleh pihak pengangkutan dan berlaku untuk pengiriman dari gudang Pihak Pertama ke Gudang Pihak Kedua.</li>
+<li>Penggantian Produk akan dilakukan dalam waktu 14 (empat belas) hari kerja setelah barang diterima oleh Pihak Kedua atau dalam bentuk nota retur dengan persetujuan kedua belah pihak terlebih dahulu secara tertulis.</li>
+<li>Produk yang dapat diretur kepada Pihak Pertama adalah berdasarkan pada kondisi yang diatur dalam ayat (1) Pasal ini.</li>
+</ol>
+<h1>PASAL 14</h1>
+<h1>KETENTUAN LAINNYA</h1>
+<ol>
+<li>Hal-hal yang belum cukup diatur atau belum cukup jelas diatur dan/ atau diperlukan perubahan ketentuan dalam Perjanjian ini, Para Pihak sepakat untuk menuangkannya kemudian dalam suatu adendum atau amandemen yang merupakan satu kesatuan serta bagian yang tidak terpisahkan dari Perjanjian ini. Dengan demikian, perubahan, penggantian maupun modifikasi terhadap Perjanjian ini hanya berlaku apabila dilakukan dengan kesepakatan atau instrumen tertulis lain yang disepakati oleh Para Pihak dan ditandatangani oleh wakil(-wakil) yang sah dari masing-masing Pihak.</li>
+<li>Apabila terdapat ketentuan dalam Perjanjian ini yang tidak dapat diberlakukan atau menjadi tidak sah berdasarkan peraturan perundang-undangan yang berlaku, maka ketidakberlakuannya atau ketidaksahan tersebut tidak akan mempengaruhi keabsahan dari ketentuan lainnya dalam Perjanjian ini. Para Pihak wajib untuk mengganti ketentuan tersebut dengan ketentuan lain yang menurut pandangan komersial paling mendekati tujuan yang dimaksud oleh ketentuan yang tidak dapat dilaksanakan atau menjadi tidak sah tersebut.</li>
+<li>Tidak satu pun Pihak yang dapat mengalihkan kepentingannya dalam Perjanjian ini tanpa persetujuan tertulis sebelumnya dari Pihak lainnya.</li>
+<li>Perjanjian ini mengikat Para Pihak atau wakil-wakil mereka yang sah, para pengganti atau pihak-pihak yang menerima hak dari masing-masing Pihak.</li>
+<li>Semua lampiran-lampiran<em> </em>yang dibuat sehubungan dengan Perjanjian ini adalah merupakan bagian dan satu kesatuan yang tidak terpisahkan dari Perjanjian ini.</li>
+<li>Perjanjian ini dapat ditandatangani secara terpisah oleh Pihak Pertama dan Pihak Kedua dalam 2 (dua) rangkap bermeterai cukup, yang masing-masing rangkapnya dianggap sebagai dokumen asli, sehingga setelah disatukan dianggap sebagai satu kesatuan utuh Perjanjian.</li>
+</ol>
+<p><strong>Demikian Perjanjian ini, dibuat dan ditandatangani di Jakarta, pada tanggal, bulan dan tahun sebagaimana disebutkan pada bagian awal Perjanjian ini, dengan itikad baik untuk dipatuhi dan dilaksanakan.</strong></p>
+
+<table class="signature">
+<tr>
+<td>
+<div class="signature-label">Pihak Pertama</div>
+<div class="signature-company">PT Perfect Companion Indonesia</div>
+<div class="signature-space"></div>
+<div class="signature-name">Handoko Tingsantoso</div>
+<div class="signature-title">Direktur Utama</div>
+</td>
+<td>
+<div class="signature-label">Pihak Kedua</div>
+<div class="signature-company">{{ party_b_legal_name }}</div>
+<div class="signature-space"></div>
+<div class="signature-name">{{ party_b_authorized_representative_name }}</div>
+<div class="signature-title">{{ party_b_authorized_representative_title }}</div>
+</td>
+</tr>
+</table>
+
+<div class="page-break"></div>
+<h2 style="text-align: center;">Lampiran A<br>Syarat dan Ketentuan<br>Nomor. {{ contract_number }}</h2>
+<table>
+    <tr>
+        <td>
+<p>Alamat Legalitas</p>
+<p>
+<em>Legal Address</em>
+</p>
+</td>
+        <td>
+<p>
+<strong>{{ second_party_place_name|default:party_b_legal_name }}</strong>
+</p>
+</td>
+    </tr>
+    <tr>
+        <td>
+<p>Nomor CVCODE</p>
+<p>
+<em>CVCODE Number</em>
+</p>
+</td>
+        <td>
+<p>
+<strong>{{ cvcode_number|default:'-' }}</strong>
+</p>
+</td>
+    </tr>
+    <tr>
+        <td>
+<p>Alamat Pengiriman</p>
+<p>
+<em>Delivery Address</em>
+</p>
+</td>
+        <td>
+<p>
+<strong>{{ delivery_address|default:second_party_place_address|default:party_b_registered_address|default:'-' }}</strong>
+</p>
+</td>
+    </tr>
+    <tr>
+        <td>
+<p>Kriteria Pihak Kedua</p>
+<p>
+<em>Second Party criteria</em>
+</p>
+</td>
+        <td>
+<p>
+<strong>{{ percentage_benefit|default:'-' }}</strong>
+</p>
+</td>
+    </tr>
+    <tr>
+        <td>
+<p>Jenis Produk</p>
+<p>
+<em>Product</em>
+</p>
+</td>
+        <td>
+<p>{{ product_scope_text_distributor|default:product_scope_text|default:'-'|safe }}</p>
+</td>
+    </tr>
+</table>
+
+<div class="page-break"></div>
+<h2 style="text-align: center;">Lampiran B<br>Target Sales / <em>Sales Target</em><br>Nomor. {{ contract_number }}</h2>
+<table>
+    {% if target_schema != 'yearly_only' %}
+    <tr>
+<td>{{ sales_target_label_q1|default:'Sales Target Q1' }}</td>
+<td><strong>{{ sales_target_q1_formatted|default:sales_target_q1|default:q1_sales_target|default:'-' }}</strong> </td>
+    </tr>
+    <tr>
+<td>{{ sales_target_label_q2|default:'Sales Target Q2' }}</td>
+<td><strong>{{ sales_target_q2_formatted|default:sales_target_q2|default:q2_sales_target|default:'-' }}</strong> </td>
+    </tr>
+    <tr>
+<td>{{ sales_target_label_q3|default:'Sales Target Q3' }}</td>
+<td><strong>{{ sales_target_q3_formatted|default:sales_target_q3|default:q3_sales_target|default:'-' }}</strong> </td>
+    </tr>
+    <tr>
+<td>{{ sales_target_label_q4|default:'Sales Target Q4' }}</td>
+<td><strong>{{ sales_target_q4_formatted|default:sales_target_q4|default:q4_sales_target|default:'-' }}</strong> </td>
+    </tr>
+    <tr>
+<td>
+<strong>Total Target Quarterly {{ non_prd_list|default:'' }}</strong>
+</td>
+<td>
+<strong>{{ total_target_qtr_formatted|default:total_target_qtr|default:'-' }} {{ non_prd_list|default:'' }}</strong>
+</td>
+</tr>
+    {% endif %}
+    <tr>
+<td>
+<strong>Total Target Yearly {{ inc_prd_list|default:'' }}</strong>
+</td>
+<td>
+<strong>{{ total_target_yrl_formatted|default:total_target_yrl|default:total_purchase_target_formatted|default:total_annual_purchase_target|default:total_purchase_target|default:'-' }} {{ inc_prd_list|default:'' }}</strong>
+</td>
+</tr>
+</table>
+{% if target_schema == 'custom_period' and custom_period_target_notes %}
+<p><strong>Catatan Target Periode Khusus:</strong> {{ custom_period_target_notes }}</p>
+{% endif %}
+<table>
+    <tr>
+        <td>Bahwa untuk total Target pembelian atas Produk yang wajib dilakukan oleh Pihak Kedua yaitu sebesar <strong>{{ total_target_yrl_formatted|default:total_target_yrl|default:total_purchase_target_formatted|default:total_purchase_target|default:'-' }}</strong> Dengan Bank Guarantee Minimum <strong>{{ bank_grt|format_idr }}</strong> biaya provisi ditanggung Distributor.</td>
+        <td>Whereas the total purchase target for Products that must be carried out by the Second Party is <strong>{{ total_target_yrl_formatted|default:total_target_yrl|default:total_purchase_target|default:'-' }}</strong> With Bank Guarantee Min <strong>{{ bank_grt|format_idr }}</strong> Provision fees by Distributors.</td>
+    </tr>
+</table>
+
+<div class="page-break"></div>
+<h2 style="text-align: center;">Lampiran C<br>Skema Insentif/Incentive Scheme<br>Nomor. {{ contract_number }}</h2>
+<table style="width: 86%; margin: 12px auto;">
+    <tr>
+        <td rowspan="4" style="width: 56%; text-align: center; vertical-align: middle; background: #d9d9d9;"><strong>Description</strong></td>
+        <td colspan="3" style="text-align: center; background: #d9d9d9;"><strong>PCI Existing Incentive Scheme</strong></td>
+    </tr>
+    <tr>
+        <td colspan="3" style="text-align: center; background: #d9d9d9;"><strong>All number in D1, D2 and D3 is in Billion</strong></td>
+    </tr>
+    <tr>
+        <td colspan="3" style="text-align: center; background: #d9d9d9;"><strong>Purchase Reward</strong></td>
+    </tr>
+    <tr>
+        <td style="text-align: center; background: #d9d9d9;"><strong>D1<br>(9,750)</strong></td>
+        <td style="text-align: center; background: #d9d9d9;"><strong>D2<br>(4,875)</strong></td>
+        <td style="text-align: center; background: #d9d9d9;"><strong>D3<br>(1,950)</strong></td>
+    </tr>
+    {% if target_schema != 'yearly_only' %}
+    <tr>
+        <td><strong>Quarterly/Perempat &amp; Yearly/Tahunan<br>(Non Cuties/Commodity)</strong></td>
+        <td></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td><strong>- 100% achievement</strong></td>
+        <td style="text-align: center;"><strong>3,5%</strong></td>
+        <td style="text-align: center;"><strong>2,0%</strong></td>
+        <td style="text-align: center;"><strong>1,0%</strong></td>
+    </tr>
+    <tr>
+        <td><strong>- 110% achievement</strong></td>
+        <td style="text-align: center;"><strong>4,5%</strong></td>
+        <td style="text-align: center;"><strong>3,0%</strong></td>
+        <td style="text-align: center;"><strong>2,0%</strong></td>
+    </tr>
+    <tr>
+        <td><strong>- 120% achievement</strong></td>
+        <td style="text-align: center;"><strong>5,5%</strong></td>
+        <td style="text-align: center;"><strong>4,0%</strong></td>
+        <td style="text-align: center;"><strong>3,0%</strong></td>
+    </tr>
+    {% endif %}
+    <tr>
+        <td><strong>Yearly/Tahunan (Incl Cuties/Commodity)</strong></td>
+        <td></td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td><strong>- 100% achievement</strong></td>
+        <td style="text-align: center;"><strong>4%</strong></td>
+        <td style="text-align: center;"><strong>4%</strong></td>
+        <td style="text-align: center;"><strong>4%</strong></td>
+    </tr>
+</table>
+
+<p><strong>Keterangan/<em>Note</em> :</strong></p>
+<table style="width: 100%; margin-top: 4px;">
+    <tr>
+        <td>
+            <ol type="a" style="margin-top: 0; margin-bottom: 0; padding-left: 22px;">
+                <li>Skema Insentif atas tahunan dan triwulan sebagaimana disebutkan diatas berlaku untuk katagori - katagori produk yang ditentukan oleh Pihak Pertama dan akan diinformasikan oleh Pihak Pertama kepada Pihak Kedua kemudian.</li>
+                <li>Apabila Pihak Kedua tidak mencapai target sebagaimana disebutkan pada Lampiran C Perjanjian ini, maka Pihak Kedua tidak berhak atas Biaya Komisi yang berlaku pada Perjanjian ini.</li>
+            </ol>
+        </td>
+    </tr>
+</table>
+
+{% if incentive_scheme_notes %}
+<p>Catatan tambahan: {{ incentive_scheme_notes }}</p>
+{% endif %}
+</body>
+</html>

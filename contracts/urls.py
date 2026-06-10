@@ -11,7 +11,8 @@ urlpatterns = [
     
     # Contract CRUD
     path('contracts/', views.contract_list, name='contract_list'),
-    path('contracts/create/', views.contract_create, name='contract_create'),
+    path('contracts/create/', views.contract_wizard_step1, name='contract_create'),
+    path('contracts/create/direct/', views.contract_wizard_step1, name='contract_create_direct'),
     path('contracts/<int:pk>/', views.contract_detail, name='contract_detail'),
     path('contracts/<int:pk>/edit/', views.contract_edit, name='contract_edit'),
     path('contracts/<int:pk>/delete/', views.contract_delete, name='contract_delete'),
@@ -23,9 +24,25 @@ urlpatterns = [
     path('contracts/<int:pk>/final-document/', views.upload_final_document, name='upload_final_document'),
     path('contracts/<int:pk>/comment/', views.add_comment, name='add_comment'),
     path('contracts/<int:pk>/data/', views.contract_data_input, name='contract_data_input'),
+    path('contracts/<int:pk>/data/review/<str:decision>/', views.review_structured_data, name='review_structured_data'),
     path('contracts/<int:pk>/drafts/regenerate/', views.regenerate_contract_draft, name='regenerate_contract_draft'),
+    path('contracts/<int:contract_id>/document/<int:document_id>/request-revision/', views.request_document_revision, name='request_document_revision'),
+    path('contracts/<int:contract_id>/revision/<int:revision_request_id>/upload-revised/', views.upload_revised_document, name='upload_revised_document'),
+    path('contracts/<int:contract_id>/revision/<int:revision_request_id>/approve/', views.approve_revised_document, name='approve_revised_document'),
+    path('contracts/<int:contract_id>/revision/<int:revision_request_id>/reject/', views.reject_revised_document, name='reject_revised_document'),
     
     # Reports & Views
     path('contracts/expiring/', views.expiring_contracts, name='expiring_contracts'),
     path('contracts/terminated/', views.terminated_contracts, name='terminated_contracts'),
+
+    # Contract Wizard
+    path('contracts/create/step-1/', views.contract_wizard_step1, name='contract_wizard_step1'),
+    path('contracts/create/step-2/', views.contract_wizard_step2, name='contract_wizard_step2'),
+    path('contracts/create/step-3/', views.contract_wizard_step3, name='contract_wizard_step3'),
+    path('contracts/create/step-4/', views.contract_wizard_step4, name='contract_wizard_step4'),
+    path('contracts/create/cancel/', views.contract_wizard_cancel, name='contract_wizard_cancel'),
+
+    # Settings & RBAC
+    path('settings/company/', views.company_settings, name='company_settings'),
+    path('settings/permissions/', views.permission_matrix, name='permission_matrix'),
 ]

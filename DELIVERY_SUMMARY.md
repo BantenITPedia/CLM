@@ -32,7 +32,7 @@ A complete, production-ready Legal Contract Lifecycle Management (CLM) system wi
 - [x] Redis 7 for caching and Celery
 - [x] Docker Compose configuration
 - [x] Automatic migrations on startup
-- [x] Auto-created superuser (admin/admin123)
+- [x] Optional superuser auto-create via `DJANGO_SUPERUSER_*` environment variables
 
 **Files Created:**
 - `manage.py`, `legal_clm/` (Django project)
@@ -457,8 +457,7 @@ docker-compose up --build
 
 # 2. Access application
 # URL: http://localhost
-# Username: admin
-# Password: admin123
+# Configure superuser credentials via DJANGO_SUPERUSER_* env vars
 ```
 
 ### Production Deployment
@@ -911,7 +910,7 @@ The Legal Contract Lifecycle Management (CLM) system is **COMPLETE and PRODUCTIO
 ### Next Steps
 1. Run `docker-compose up --build`
 2. Access http://localhost
-3. Login with admin/admin123
+3. Login with your configured superuser account
 4. Create your first contract
 5. Test all features using TEST_SCENARIOS.md
 

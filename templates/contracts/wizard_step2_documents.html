@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Create Contract" %} - {% trans "Step 2" %}{% endblock %}
+{% block page_title %}{% trans "Create Contract" %}{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">{% trans "Contract Wizard" %}</h6>
+                        <span class="badge bg-primary">{% trans "Step 2 of 4" %}</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar" role="progressbar" style="width: 50%;"></div>
+                    </div>
+                    <div class="row mt-3 text-center small text-muted">
+                        <div class="col text-success">{% trans "1. Entity Type" %}</div>
+                        <div class="col"><strong class="text-primary">{% trans "2. Admin Docs" %}</strong></div>
+                        <div class="col">{% trans "3. Contract Info" %}</div>
+                        <div class="col">{% trans "4. Structured Data" %}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4">
+                    <h4 class="mb-1">{% trans "Upload Administrative Documents" %}</h4>
+                    <p class="text-muted mb-0">Entity type: <strong>{{ entity_display }}</strong></p>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <strong>{% trans "Hint" %}:</strong> {% trans "Only files relevant to the selected entity type are shown here. Supported formats: PDF, JPG, JPEG, PNG." %}
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="row">
+                            {% for field in form %}
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                                    {{ field.label }} {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                {{ field }}
+                                {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors|striptags }}</div>
+                                {% endif %}
+                                {% if field.help_text %}
+                                <small class="text-muted">{{ field.help_text }}</small>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'contract_wizard_step1' %}" class="btn btn-outline-secondary">{% trans "Back" %}</a>
+                            <div>
+                                <a href="{% url 'contract_wizard_cancel' %}" class="btn btn-outline-danger me-2">{% trans "Cancel" %}</a>
+                                <button type="submit" class="btn btn-primary px-4">{% trans "Continue" %}</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

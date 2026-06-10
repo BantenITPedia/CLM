@@ -8,12 +8,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-default-key-change-me')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in config(
+        'ALLOWED_HOSTS',
+        default='localhost,127.0.0.1,clm.perfectcompanion.co.id'
+    ).split(',')
+    if host.strip()
+]
+for required_host in ['localhost', '127.0.0.1', 'clm.perfectcompanion.co.id']:
+    if required_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(required_host)
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in
     config(
         'CSRF_TRUSTED_ORIGINS',
-        default='http://localhost,http://127.0.0.1,http://10.231.7.8,https://clm.perfectcompanion.co.id'
+        default='http://localhost,http://127.0.0.1,http://10.231.7.8,http://clm.perfectcompanion.co.id,https://clm.perfectcompanion.co.id'
     ).split(',')
     if origin.strip()
 ]
@@ -38,6 +48,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
+    'legal_clm.middleware.NoCacheHtmlMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -56,6 +68,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
+                'django.template.context_processors.i18n',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -87,6 +100,13 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
+LANGUAGES = [
+    ('en', 'English'),
+    ('id', 'Bahasa Indonesia'),
+]
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
@@ -128,6 +148,7 @@ SITE_URL = config('SITE_URL', default='http://localhost')
 if not DEBUG:
     # Trust X-Forwarded-Proto from reverse proxy
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
     SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
     SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
     CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)

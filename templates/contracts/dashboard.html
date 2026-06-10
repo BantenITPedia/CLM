@@ -1,62 +1,87 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Dashboard - Legal CLM{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block title %}{% trans "Dashboard" %} - Legal CLM{% endblock %}
+{% block page_title %}{% trans "Dashboard" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <!-- Statistics Cards -->
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="stat-card primary">
-                <h3>{{ total_contracts }}</h3>
-                <p class="mb-0">Total Contracts</p>
-            </div>
+            <a href="{% url 'contract_list' %}" class="text-decoration-none">
+                <div class="stat-card primary">
+                    <h3>{{ total_contracts }}</h3>
+                    <p class="mb-0">{% trans "Total Contracts" %}</p>
+                </div>
+            </a>
         </div>
         <div class="col-md-3">
-            <div class="stat-card success">
-                <h3>{{ active_contracts }}</h3>
-                <p class="mb-0">Active Contracts</p>
-            </div>
+            <a href="{% url 'contract_list' %}?dashboard_filter=active" class="text-decoration-none">
+                <div class="stat-card success">
+                    <h3>{{ active_contracts }}</h3>
+                    <p class="mb-0">{% trans "Active Contracts" %}</p>
+                </div>
+            </a>
         </div>
         <div class="col-md-3">
-            <div class="stat-card warning">
-                <h3>{{ expiring_soon_contracts }}</h3>
-                <p class="mb-0">Expiring Soon</p>
-            </div>
+            <a href="{% url 'contract_list' %}?dashboard_filter=expiring" class="text-decoration-none">
+                <div class="stat-card warning">
+                    <h3>{{ expiring_soon_contracts }}</h3>
+                    <p class="mb-0">{% trans "Expiring Soon" %}</p>
+                </div>
+            </a>
         </div>
         <div class="col-md-3">
-            <div class="stat-card info">
-                <h3>{{ legal_review_contracts }}</h3>
-                <p class="mb-0">Legal Review</p>
-            </div>
+            <a href="{% url 'contract_list' %}?dashboard_filter=draft" class="text-decoration-none">
+                <div class="stat-card secondary">
+                    <h3>{{ draft_contracts }}</h3>
+                    <p class="mb-0">{% trans "Draft Contracts" %}</p>
+                </div>
+            </a>
         </div>
     </div>
+
+    {% if is_legal_team %}
+    <!-- Legal Review Queue -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <a href="{% url 'contract_list' %}?dashboard_filter=legal_review" class="text-decoration-none">
+                <div class="stat-card info">
+                    <h3>{{ legal_review_contracts }}</h3>
+                    <p class="mb-0">{% trans "Legal Review Queue" %}</p>
+                </div>
+            </a>
+        </div>
+    </div>
+    {% endif %}
     
     <!-- Expiry Overview -->
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Expiry Overview</h5>
+                    <h5 class="mb-0"><i class="bi bi-calendar-event"></i> {% trans "Expiry Overview" %}</h5>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
-                        <div class="col-md-3">
-                            <h4 class="text-warning">{{ expiring_30 }}</h4>
-                            <p class="text-muted">Expiring in 30 days</p>
+                        <div class="col-md-4">
+                            <a href="{% url 'contract_list' %}?dashboard_filter=expiring" class="text-decoration-none">
+                                <h4 class="text-warning">{{ expiring_soon_contracts }}</h4>
+                                <p class="text-muted">{% trans "Expiring Soon" %}</p>
+                            </a>
                         </div>
-                        <div class="col-md-3">
-                            <h4 class="text-info">{{ expiring_60 }}</h4>
-                            <p class="text-muted">Expiring in 60 days</p>
+                        <div class="col-md-4">
+                            <a href="{% url 'contract_list' %}?dashboard_filter=expiring_60" class="text-decoration-none">
+                                <h4 class="text-info">{{ expiring_60 }}</h4>
+                                <p class="text-muted">{% trans "Expiring in 60 days" %}</p>
+                            </a>
                         </div>
-                        <div class="col-md-3">
-                            <h4 class="text-primary">{{ expiring_90 }}</h4>
-                            <p class="text-muted">Expiring in 90 days</p>
-                        </div>
-                        <div class="col-md-3">
-                            <h4 class="text-danger">{{ expiring_soon_contracts }}</h4>
-                            <p class="text-muted">Expiring Soon</p>
+                        <div class="col-md-4">
+                            <a href="{% url 'contract_list' %}?dashboard_filter=expiring_90" class="text-decoration-none">
+                                <h4 class="text-primary">{{ expiring_90 }}</h4>
+                                <p class="text-muted">{% trans "Expiring in 90 days" %}</p>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -70,7 +95,7 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Needs Attention</h5>
+                    <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> {% trans "Needs Attention" %}</h5>
                 </div>
                 <div class="card-body">
                     {% if needs_attention %}
@@ -80,7 +105,7 @@
                             <div class="d-flex w-100 justify-content-between">
                                 <h6 class="mb-1">{{ contract.title }}</h6>
                                 <small>
-                                    <span class="badge bg-{{ contract.status|slice:':6' }}">{{ contract.get_status_display }}</span>
+                                    <span class="badge bg-{{ contract.status|slice:':6' }}">{% if contract.status == 'SUBMITTED' %}{% trans "Legal Review" %}{% else %}{{ contract.get_status_display }}{% endif %}</span>
                                 </small>
                             </div>
                             <p class="mb-1 text-muted small">{{ contract.party_b }}</p>
@@ -88,9 +113,9 @@
                             <small class="text-danger">
                                 <i class="bi bi-calendar"></i> 
                                 {% if contract.days_until_expiry %}
-                                    Expires in {{ contract.days_until_expiry }} days
+                                    {% blocktrans with days=contract.days_until_expiry %}Expires in {{ days }} days{% endblocktrans %}
                                 {% else %}
-                                    Expired
+                                    {% trans "Expired" %}
                                 {% endif %}
                             </small>
                             {% endif %}
@@ -98,7 +123,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-muted text-center py-3">No contracts need immediate attention</p>
+                    <p class="text-muted text-center py-3">{% trans "No contracts need immediate attention" %}</p>
                     {% endif %}
                 </div>
             </div>
@@ -108,8 +133,8 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Contracts</h5>
-                    <a href="{% url 'contract_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> {% trans "Recent Contracts" %}</h5>
+                    <a href="{% url 'contract_list' %}" class="btn btn-sm btn-outline-primary">{% trans "View All" %}</a>
                 </div>
                 <div class="card-body">
                     {% if recent_contracts %}
@@ -122,13 +147,13 @@
                             </div>
                             <p class="mb-1 text-muted small">{{ contract.get_contract_type_display }} - {{ contract.party_b }}</p>
                             <small>
-                                <span class="badge bg-secondary">{{ contract.get_status_display }}</span>
+                                <span class="badge bg-secondary">{% if contract.status == 'SUBMITTED' %}{% trans "Legal Review" %}{% else %}{{ contract.get_status_display }}{% endif %}</span>
                             </small>
                         </a>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-muted text-center py-3">No contracts yet</p>
+                    <p class="text-muted text-center py-3">{% trans "No contracts yet" %}</p>
                     {% endif %}
                 </div>
             </div>
@@ -140,32 +165,32 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header bg-white">
-                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h5>
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> {% trans "Quick Actions" %}</h5>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
                         <div class="col-md-3">
                             <a href="{% url 'contract_create' %}" class="btn btn-outline-primary btn-lg w-100">
                                 <i class="bi bi-plus-circle"></i><br>
-                                <small>Create Contract</small>
+                                <small>{% trans "Create Contract" %}</small>
                             </a>
                         </div>
                         <div class="col-md-3">
                             <a href="{% url 'contract_list' %}" class="btn btn-outline-secondary btn-lg w-100">
                                 <i class="bi bi-list"></i><br>
-                                <small>View All</small>
+                                <small>{% trans "View All" %}</small>
                             </a>
                         </div>
                         <div class="col-md-3">
                             <a href="{% url 'expiring_contracts' %}" class="btn btn-outline-warning btn-lg w-100">
                                 <i class="bi bi-exclamation-triangle"></i><br>
-                                <small>Expiring Soon</small>
+                                <small>{% trans "Expiring Soon" %}</small>
                             </a>
                         </div>
                         <div class="col-md-3">
                             <a href="{% url 'terminated_contracts' %}" class="btn btn-outline-danger btn-lg w-100">
                                 <i class="bi bi-x-circle"></i><br>
-                                <small>Terminated</small>
+                                <small>{% trans "Terminated" %}</small>
                             </a>
                         </div>
                     </div>

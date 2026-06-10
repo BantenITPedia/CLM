@@ -79,10 +79,11 @@ docker-compose up --build
 - Application: http://localhost
 - Admin Panel: http://localhost/admin/
 
-4. **Default credentials:**
+4. **Create or configure superuser credentials:**
 
-- Username: `admin`
-- Password: `admin123`
+- Set environment variables before startup:
+   `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, `DJANGO_SUPERUSER_PASSWORD`
+- Or run `docker-compose exec web python manage.py createsuperuser`
 
 ### What Gets Created Automatically
 
@@ -92,7 +93,14 @@ docker-compose up --build
 - Celery worker for background tasks
 - Celery beat for scheduled tasks
 - Nginx reverse proxy
-- Superuser account (admin/admin123)
+- Superuser account (only if `DJANGO_SUPERUSER_*` variables are provided)
+
+## User Manual
+
+For a step-by-step guide written for non-technical users, see:
+
+- English: [USER_MANUAL.md](USER_MANUAL.md)
+- Bahasa Indonesia: [USER_MANUAL_ID.md](USER_MANUAL_ID.md)
 
 ## Project Structure
 

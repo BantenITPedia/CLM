@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+{% load i18n %}
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -81,6 +82,8 @@
         .stat-card.primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .stat-card.success { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
         .stat-card.warning { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .stat-card.info { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .stat-card.secondary { background: linear-gradient(135deg, #6a85b6 0%, #bac8e0 100%); }
         .stat-card.danger { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
         
         .badge-status {
@@ -103,6 +106,24 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    {% if not user.is_authenticated %}
+    <div class="container-fluid py-2">
+        <div class="d-flex justify-content-end">
+            <form action="{% url 'set_language' %}" method="post" class="d-inline-flex align-items-center">
+                {% csrf_token %}
+                <input name="next" type="hidden" value="{{ request.get_full_path }}">
+                <label for="language-select-public" class="visually-hidden">{% trans "Language" %}</label>
+                <select id="language-select-public" name="language" class="form-select form-select-sm" onchange="this.form.submit()">
+                    {% get_current_language as CURRENT_LANGUAGE %}
+                    {% get_available_languages as AVAILABLE_LANGUAGES %}
+                    {% for code, name in AVAILABLE_LANGUAGES %}
+                    <option value="{{ code }}" {% if code == CURRENT_LANGUAGE %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+    </div>
+    {% endif %}
     {% if user.is_authenticated %}
     <!-- Sidebar -->
     <div class="sidebar">
@@ -111,28 +132,28 @@
         </div>
         <nav class="nav flex-column mt-3">
             <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
-                <i class="bi bi-speedometer2"></i> Dashboard
+                <i class="bi bi-speedometer2"></i> {% trans "Dashboard" %}
             </a>
             <a class="nav-link {% if request.resolver_match.url_name == 'contract_list' %}active{% endif %}" href="{% url 'contract_list' %}">
-                <i class="bi bi-file-text"></i> All Contracts
+                <i class="bi bi-file-text"></i> {% trans "All Contracts" %}
             </a>
             <a class="nav-link {% if request.resolver_match.url_name == 'contract_create' %}active{% endif %}" href="{% url 'contract_create' %}">
-                <i class="bi bi-plus-circle"></i> Create Contract
+                <i class="bi bi-plus-circle"></i> {% trans "Create Contract" %}
             </a>
             <a class="nav-link {% if request.resolver_match.url_name == 'expiring_contracts' %}active{% endif %}" href="{% url 'expiring_contracts' %}">
-                <i class="bi bi-exclamation-triangle"></i> Expiring Soon
+                <i class="bi bi-exclamation-triangle"></i> {% trans "Expiring Soon" %}
             </a>
             <a class="nav-link {% if request.resolver_match.url_name == 'terminated_contracts' %}active{% endif %}" href="{% url 'terminated_contracts' %}">
-                <i class="bi bi-x-circle"></i> Terminated
+                <i class="bi bi-x-circle"></i> {% trans "Terminated" %}
             </a>
             <hr style="border-color: #495057; margin: 10px 20px;">
             {% if user.is_staff %}
             <a class="nav-link" href="/admin/">
-                <i class="bi bi-gear"></i> Admin Panel
+                <i class="bi bi-gear"></i> {% trans "Admin Panel" %}
             </a>
             {% endif %}
             <a class="nav-link" href="{% url 'logout' %}">
-                <i class="bi bi-box-arrow-right"></i> Logout
+                <i class="bi bi-box-arrow-right"></i> {% trans "Logout" %}
             </a>
         </nav>
     </div>
@@ -140,11 +161,23 @@
     <!-- Top Navbar -->
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">{% block page_title %}Dashboard{% endblock %}</span>
+            <span class="navbar-brand mb-0 h1">{% block page_title %}{% trans "Dashboard" %}{% endblock %}</span>
             <div class="d-flex align-items-center">
+                <form action="{% url 'set_language' %}" method="post" class="me-3">
+                    {% csrf_token %}
+                    <input name="next" type="hidden" value="{{ request.get_full_path }}">
+                    <label for="language-select" class="visually-hidden">{% trans "Language" %}</label>
+                    <select id="language-select" name="language" class="form-select form-select-sm" onchange="this.form.submit()">
+                        {% get_current_language as CURRENT_LANGUAGE %}
+                        {% get_available_languages as AVAILABLE_LANGUAGES %}
+                        {% for code, name in AVAILABLE_LANGUAGES %}
+                        <option value="{{ code }}" {% if code == CURRENT_LANGUAGE %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
                 <span class="me-3">
                     <i class="bi bi-person-circle"></i> 
-                    {{ user.get_full_name|default:user.username }}
+                    {% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %}
                 </span>
             </div>
         </div>

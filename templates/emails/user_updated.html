@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>User Updated</title>
+</head>
+<body>
+    <p>Hi Team,</p>
+
+    <p>A user account was <strong>updated</strong> in Legal CLM.</p>
+
+    <ul>
+        <li><strong>Username:</strong> {{ target_user.username }}</li>
+        <li><strong>Name:</strong> {{ target_user_name }}</li>
+        <li><strong>Email:</strong> {{ target_user_email }}</li>
+        <li><strong>Changed fields:</strong> {{ changed_fields_text }}</li>
+        <li><strong>is_staff:</strong> {{ target_user.is_staff }}</li>
+        <li><strong>is_superuser:</strong> {{ target_user.is_superuser }}</li>
+        <li><strong>is_active:</strong> {{ target_user.is_active }}</li>
+        <li><strong>Updated by:</strong> {{ actor_name }}{% if actor_email %} ({{ actor_email }}){% endif %}</li>
+    </ul>
+
+    <p>
+        Open Users Admin:
+        <a href="{{ site_url }}/admin/auth/user/">{{ site_url }}/admin/auth/user/</a>
+    </p>
+
+    <p>Best regards,<br>Legal CLM System</p>
+</body>
+</html>

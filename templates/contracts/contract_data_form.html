@@ -1,24 +1,26 @@
 {% extends 'base.html' %}
+{% load i18n %}
 
-{% block title %}Contract Data - {{ contract.title }}{% endblock %}
-{% block page_title %}Structured Data Input{% endblock %}
+{% block title %}{% trans "Contract Data" %} - {{ contract.title }}{% endblock %}
+{% block page_title %}{% trans "Structured Data Input" %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="card">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">{{ contract.title }} - Data Capture</h5>
-            <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-outline-secondary btn-sm">Back to Contract</a>
+            <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-outline-secondary btn-sm">{% trans "Back to Contract" %}</a>
         </div>
         <div class="card-body">
             <div class="alert alert-info" role="alert">
-                <i class="bi bi-info-circle"></i> Fill in the details below. When you click <strong>"Submit Data"</strong>, your information will be saved and a contract draft will be automatically generated.
+                <i class="bi bi-info-circle"></i> {% blocktrans %}Fill in the details below. When you click <strong>"Submit Data"</strong>, your information will be saved and a contract draft will be automatically generated.{% endblocktrans %}
             </div>
             <p class="text-muted mb-4">Fields are defined by Legal/Admin for <strong>{{ contract.get_contract_type_display }}</strong>.</p>
             <form method="post" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
+                <div class="row g-3">
                 {% for field in form %}
-                <div class="mb-3">
+                <div class="data-field-wrapper {% if field.field.widget.input_type == 'textarea' %}col-12{% else %}col-md-6{% endif %}">
                     <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
                     {{ field }}
                     {% if field.errors %}
@@ -26,9 +28,10 @@
                     {% endif %}
                 </div>
                 {% endfor %}
+                </div>
                 <div class="d-flex justify-content-end">
-                    <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-outline-secondary me-2">Cancel</a>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Data</button>
+                    <a href="{% url 'contract_detail' contract.pk %}" class="btn btn-outline-secondary me-2">{% trans "Cancel" %}</a>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> {% trans "Save Data" %}</button>
                 </div>
             </form>
         </div>
@@ -39,6 +42,9 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const contractTypeCode = '{{ contract.contract_type }}';
+        const isGtContract = ['GENERAL_TRADE', 'GENERAL_TRADE_PREMIUM'].includes(contractTypeCode);
+        const isDistributorContract = contractTypeCode === 'DISTRIBUTOR';
         const totalTargetField = document.querySelector('input[name="total_purchase_target"]');
         const q1Field = document.querySelector('input[name="sales_target_q1"]');
         const q2Field = document.querySelector('input[name="sales_target_q2"]');
@@ -81,11 +87,30 @@
             return d;
         };
 
+        const formatIsoDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
         const formatDate = (date) => date.toLocaleDateString('id-ID', {
             day: '2-digit',
             month: 'short',
             year: 'numeric'
         });
+
+        const setEndDateFromStart = () => {
+            if (!isGtContract || !startDateField || !endDateField) return;
+            if (!startDateField.value) return;
+
+            const startDate = new Date(startDateField.value);
+            if (Number.isNaN(startDate.getTime())) return;
+
+            const endDate = addMonths(startDate, 12);
+            endDate.setDate(endDate.getDate() - 1);
+            endDateField.value = formatIsoDate(endDate);
+        };
 
         const setQuarterPeriods = () => {
             if (!startDateField || !q1PeriodField || !q2PeriodField || !q3PeriodField || !q4PeriodField) return;
@@ -124,18 +149,42 @@
             q4PeriodField.value = `${formatDate(q4Start)} - ${formatDate(finalEnd)}`;
         };
 
-        if (totalTargetField) {
+        if (totalTargetField && isGtContract) {
             totalTargetField.addEventListener('input', setQuarterTargets);
+            totalTargetField.addEventListener('change', setQuarterTargets);
             setQuarterTargets();
         }
 
-        if (startDateField) {
-            startDateField.addEventListener('change', setQuarterPeriods);
+        if ((isGtContract || isDistributorContract) && startDateField) {
+            startDateField.addEventListener('change', () => {
+                setEndDateFromStart();
+                setQuarterPeriods();
+            });
         }
-        if (endDateField) {
+        if ((isGtContract || isDistributorContract) && endDateField) {
             endDateField.addEventListener('change', setQuarterPeriods);
         }
-        setQuarterPeriods();
+
+        if (isGtContract && endDateField) {
+            endDateField.readOnly = true;
+            endDateField.classList.add('bg-light');
+        }
+
+        if (isGtContract) {
+            [q1Field, q2Field, q3Field, q4Field, q1PeriodField, q2PeriodField, q3PeriodField, q4PeriodField]
+                .filter(Boolean)
+                .forEach((field) => {
+                    field.readOnly = true;
+                    field.classList.add('bg-light');
+                });
+        }
+
+        if (isGtContract) {
+            setEndDateFromStart();
+        }
+        if (isGtContract || isDistributorContract) {
+            setQuarterPeriods();
+        }
     });
 </script>
 {% endblock %}

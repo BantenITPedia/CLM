@@ -1,28 +1,62 @@
 from django.core.mail import send_mail
+from django.template import Context, Template
 from django.template.loader import render_to_string
+from django.core.mail import get_connection
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import PasswordResetForm
 from django.utils.html import strip_tags
-from .models import AuditLog
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
+from urllib import request as urlrequest
+from urllib import error as urlerror
+from types import SimpleNamespace
+import logging
+import json
+from .models import AuditLog, NotificationEmailTemplate, EmailSettings
+
+
+logger = logging.getLogger(__name__)
 
 
 class EmailService:
     """Centralized email service for all contract-related emails"""
     
     @staticmethod
-    def _send_email(subject, template_name, context, recipient_list):
+    def _event_key_from_template_name(template_name):
+        event_key = template_name or ''
+        if event_key.startswith('emails/'):
+            event_key = event_key[len('emails/'):]
+        if event_key.endswith('.html'):
+            event_key = event_key[:-len('.html')]
+        return event_key
+
+    @classmethod
+    def _send_email(cls, subject, template_name, context, recipient_list):
         """Helper method to send emails"""
         try:
-            html_message = render_to_string(template_name, context)
-            plain_message = strip_tags(html_message)
+            event_key = cls._event_key_from_template_name(template_name)
+            template_config = NotificationEmailTemplate.objects.filter(event_key=event_key).first()
+
+            if template_config and not template_config.enabled:
+                return False
+
+            if template_config and template_config.subject_template:
+                subject = Template(template_config.subject_template).render(Context(context))
+
+            if template_config and template_config.use_custom_html and template_config.html_template:
+                html_message = Template(template_config.html_template).render(Context(context))
+            else:
+                html_message = render_to_string(template_name, context)
+
+            if template_config and template_config.text_template:
+                plain_message = Template(template_config.text_template).render(Context(context))
+            else:
+                plain_message = strip_tags(html_message)
             
-            send_mail(
-                subject=subject,
-                message=plain_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=recipient_list,
-                html_message=html_message,
-                fail_silently=False,
-            )
+            if not cls._dispatch_email(subject, plain_message, html_message, recipient_list):
+                return False
             
             # Log email sent
             if 'contract' in context:
@@ -34,8 +68,304 @@ class EmailService:
             
             return True
         except Exception as e:
-            print(f"Email sending failed: {e}")
+            logger.exception("Email sending failed (template email): %s", e)
             return False
+
+    @staticmethod
+    def _send_plain_email(subject, message, recipient_list, contract=None):
+        """Helper method to send plain text emails"""
+        clean_recipients = list(set(filter(None, recipient_list)))
+        if not clean_recipients:
+            return False
+
+        try:
+            if not EmailService._dispatch_email(subject, message, None, clean_recipients):
+                return False
+
+            if contract:
+                AuditLog.objects.create(
+                    contract=contract,
+                    action='EMAIL_SENT',
+                    details=f"Email sent: {subject} to {', '.join(clean_recipients)}"
+                )
+
+            return True
+        except Exception as e:
+            logger.exception("Email sending failed (plain email): %s", e)
+            return False
+
+    @staticmethod
+    def _get_active_email_settings():
+        return EmailSettings.objects.filter(is_active=True).order_by('-updated_at').first()
+
+    @staticmethod
+    def _send_via_resend(subject, text_message, html_message, recipients, from_email, cfg):
+        api_key = cfg.api_key or getattr(settings, 'RESEND_API_KEY', '')
+        if not api_key:
+            return False
+
+        endpoint = cfg.api_endpoint or 'https://api.resend.com/emails'
+        payload = {
+            'from': from_email,
+            'to': recipients,
+            'subject': subject,
+        }
+        if html_message:
+            payload['html'] = html_message
+        if text_message:
+            payload['text'] = text_message
+
+        body = json.dumps(payload).encode('utf-8')
+        req = urlrequest.Request(
+            endpoint,
+            data=body,
+            method='POST',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+        )
+        try:
+            with urlrequest.urlopen(req, timeout=15) as response:
+                return 200 <= response.status < 300
+        except urlerror.URLError as exc:
+            print(f"Resend API failed: {exc}")
+            return False
+
+    @staticmethod
+    def _send_via_sendgrid(subject, text_message, html_message, recipients, from_email, cfg):
+        api_key = cfg.api_key or getattr(settings, 'SENDGRID_API_KEY', '')
+        if not api_key:
+            return False
+
+        endpoint = cfg.api_endpoint or 'https://api.sendgrid.com/v3/mail/send'
+        content = []
+        if text_message:
+            content.append({'type': 'text/plain', 'value': text_message})
+        if html_message:
+            content.append({'type': 'text/html', 'value': html_message})
+        if not content:
+            return False
+
+        payload = {
+            'personalizations': [{'to': [{'email': email} for email in recipients]}],
+            'from': {'email': from_email},
+            'subject': subject,
+            'content': content,
+        }
+
+        body = json.dumps(payload).encode('utf-8')
+        req = urlrequest.Request(
+            endpoint,
+            data=body,
+            method='POST',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+        )
+        try:
+            with urlrequest.urlopen(req, timeout=15) as response:
+                return 200 <= response.status < 300
+        except urlerror.URLError as exc:
+            print(f"SendGrid API failed: {exc}")
+            return False
+
+    @staticmethod
+    def _send_via_smtp(subject, text_message, html_message, recipients, from_email, cfg):
+        host = cfg.host or settings.EMAIL_HOST
+        port = cfg.port or settings.EMAIL_PORT
+        username = cfg.username or settings.EMAIL_HOST_USER
+        password = cfg.password or settings.EMAIL_HOST_PASSWORD
+        use_tls = cfg.use_tls
+        use_ssl = cfg.use_ssl
+
+        connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            use_tls=use_tls,
+            use_ssl=use_ssl,
+        )
+
+        send_mail(
+            subject=subject,
+            message=text_message or '',
+            from_email=from_email,
+            recipient_list=recipients,
+            html_message=html_message,
+            fail_silently=False,
+            connection=connection,
+        )
+        return True
+
+    @staticmethod
+    def _send_via_default_backend(subject, text_message, html_message, recipients):
+        sent_count = send_mail(
+            subject=subject,
+            message=text_message or '',
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipients,
+            html_message=html_message,
+            fail_silently=True,
+        )
+        return sent_count > 0
+
+    @classmethod
+    def _dispatch_email(cls, subject, text_message, html_message, recipients):
+        clean_recipients = list(set(filter(None, recipients)))
+        if not clean_recipients:
+            return False
+
+        cfg = cls._get_active_email_settings()
+        if cfg:
+            from_email = cfg.default_from_email or settings.DEFAULT_FROM_EMAIL
+            provider = cfg.provider
+            try:
+                if provider == EmailSettings.PROVIDER_RESEND:
+                    if cls._send_via_resend(subject, text_message, html_message, clean_recipients, from_email, cfg):
+                        return True
+                elif provider == EmailSettings.PROVIDER_SENDGRID:
+                    if cls._send_via_sendgrid(subject, text_message, html_message, clean_recipients, from_email, cfg):
+                        return True
+
+                if cls._send_via_smtp(subject, text_message, html_message, clean_recipients, from_email, cfg):
+                    return True
+            except Exception as exc:
+                print(f"Provider/SMTP dispatch failed, trying default backend: {exc}")
+
+        return cls._send_via_default_backend(subject, text_message, html_message, clean_recipients)
+
+    @staticmethod
+    def _get_admin_user_emails(exclude_user=None):
+        """Get unique emails of active staff/superusers for operational alerts."""
+        queryset = User.objects.filter(is_active=True, email__isnull=False).exclude(email='')
+        queryset = queryset.filter(Q(is_staff=True) | Q(is_superuser=True))
+
+        if exclude_user and exclude_user.pk:
+            queryset = queryset.exclude(pk=exclude_user.pk)
+
+        return list(queryset.values_list('email', flat=True).distinct())
+
+    @classmethod
+    def send_user_crud_notification(cls, action, target_user, actor=None, changed_fields=None):
+        """Send notification when a system user is created/updated/deleted from CLM admin."""
+        actor_name = 'System'
+        actor_email = ''
+        if actor:
+            actor_name = actor.get_full_name() or actor.username or 'System'
+            actor_email = actor.email or ''
+
+        target_payload = {
+            'username': getattr(target_user, 'username', ''),
+            'first_name': getattr(target_user, 'first_name', ''),
+            'last_name': getattr(target_user, 'last_name', ''),
+            'email': getattr(target_user, 'email', ''),
+            'is_staff': getattr(target_user, 'is_staff', False),
+            'is_superuser': getattr(target_user, 'is_superuser', False),
+            'is_active': getattr(target_user, 'is_active', False),
+        }
+        return cls.send_user_crud_notification_from_data(
+            action=action,
+            target_payload=target_payload,
+            actor_name=actor_name,
+            actor_email=actor_email,
+            changed_fields=changed_fields,
+            exclude_user=actor,
+        )
+
+    @classmethod
+    def send_user_crud_notification_from_data(
+        cls,
+        action,
+        target_payload,
+        actor_name='System',
+        actor_email='',
+        changed_fields=None,
+        exclude_user=None,
+    ):
+        """Send notification when a system user is created/updated/deleted from CLM admin."""
+        action = (action or '').upper()
+        if action not in {'CREATE', 'UPDATE', 'DELETE'}:
+            return False
+
+        target_user = SimpleNamespace(**(target_payload or {}))
+        target_user.get_full_name = lambda: ' '.join(
+            filter(None, [getattr(target_user, 'first_name', ''), getattr(target_user, 'last_name', '')])
+        ).strip()
+
+        user_label = target_user.get_full_name() or target_user.username or '(unknown user)'
+        user_email = target_user.email or '(no email)'
+        fields_text = ', '.join(changed_fields or []) if changed_fields else '-'
+
+        action_text = {
+            'CREATE': 'created',
+            'UPDATE': 'updated',
+            'DELETE': 'deleted',
+        }[action]
+
+        subject = f"[USER {action}] CLM user {action_text}: {target_user.username}"
+        template_map = {
+            'CREATE': 'emails/user_created.html',
+            'UPDATE': 'emails/user_updated.html',
+            'DELETE': 'emails/user_deleted.html',
+        }
+        template_name = template_map[action]
+
+        context = {
+            'action': action,
+            'action_text': action_text,
+            'target_user': target_user,
+            'target_user_name': user_label,
+            'target_user_email': user_email,
+            'actor_name': actor_name,
+            'actor_email': actor_email,
+            'changed_fields_text': fields_text,
+            'site_url': settings.SITE_URL,
+        }
+
+        recipients = cls._get_admin_user_emails(exclude_user=exclude_user)
+        if action == 'UPDATE' and target_user.email:
+            recipients.append(target_user.email)
+
+        recipients = list(set(filter(None, recipients)))
+        sent_any = False
+        if recipients:
+            sent_any = cls._send_email(subject, template_name, context, recipients) or sent_any
+
+        if action == 'CREATE' and target_user.email:
+            welcome_subject = 'Your Legal CLM account has been created'
+            welcome_context = {
+                'target_user': target_user,
+                'target_user_name': user_label,
+                'target_user_email': user_email,
+                'actor_name': actor_name,
+                'site_url': settings.SITE_URL,
+                'is_new_user_notification': True,
+                'login_url': f"{settings.SITE_URL.rstrip('/')}/",
+                'password_reset_url': f"{settings.SITE_URL.rstrip('/')}/password-reset/",
+            }
+            sent_any = cls._send_email(
+                welcome_subject,
+                'emails/user_created.html',
+                welcome_context,
+                [target_user.email],
+            ) or sent_any
+
+            reset_form = PasswordResetForm({'email': target_user.email})
+            if reset_form.is_valid():
+                reset_form.save(
+                    domain_override=settings.SITE_URL.replace('http://', '').replace('https://', '').rstrip('/'),
+                    use_https=settings.SITE_URL.startswith('https://'),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    email_template_name='registration/password_reset_email.html',
+                    subject_template_name='registration/password_reset_subject.txt',
+                )
+                sent_any = True
+
+        return sent_any
     
     @staticmethod
     def _get_participant_emails(contract, roles=None, notification_filter='critical'):
@@ -77,6 +407,68 @@ class EmailService:
             participants = participants.filter(notification_preference='all')
         
         return participants
+
+    @staticmethod
+    def _get_activity_recipients(contract, actor=None):
+        """Recipients for operational activity notifications (excluding users who opted out)."""
+        participants = contract.participants.filter(is_active=True).exclude(notification_preference='none')
+
+        recipients = []
+        for participant in participants:
+            if participant.external_email:
+                recipients.append(participant.external_email)
+            elif participant.user and participant.user.email:
+                recipients.append(participant.user.email)
+
+        if contract.owner and contract.owner.email:
+            recipients.append(contract.owner.email)
+        if contract.created_by and contract.created_by.email:
+            recipients.append(contract.created_by.email)
+
+        # Include legal team users even when they are not explicitly listed
+        # as participants on a specific contract.
+        legal_team_emails = User.objects.filter(
+            Q(is_superuser=True) |
+            Q(groups__name__in=['CLM Legal', 'CLM Admin', 'Legal Team'])
+        ).exclude(email='').values_list('email', flat=True)
+        recipients.extend(list(legal_team_emails))
+
+        actor_email = getattr(actor, 'email', None)
+        if actor_email:
+            recipients = [email for email in recipients if email != actor_email]
+
+        return list(set(filter(None, recipients)))
+
+    @classmethod
+    def send_contract_activity_email(cls, contract, action_title, actor=None, details='', event_key=None):
+        """Send generic operational update emails for contract lifecycle actions."""
+        if event_key:
+            template_config = NotificationEmailTemplate.objects.filter(event_key=event_key).first()
+            if template_config and not template_config.enabled:
+                return False
+
+        recipients = cls._get_activity_recipients(contract, actor=actor)
+        if not recipients:
+            return False
+
+        actor_name = 'System'
+        if actor:
+            actor_name = actor.get_full_name() or actor.username or 'System'
+
+        subject = f"[UPDATE] {action_title}: {contract.title}"
+        message = (
+            f"Hi Team,\n\n"
+            f"There is a new contract activity.\n"
+            f"Contract: {contract.title}\n"
+            f"Action: {action_title}\n"
+            f"By: {actor_name}\n"
+            f"{('Details: ' + details + chr(10)) if details else ''}"
+            f"Open contract: {settings.SITE_URL}/contracts/{contract.id}/\n\n"
+            f"Best regards,\n"
+            f"Legal CLM System"
+        )
+
+        return cls._send_plain_email(subject, message, recipients, contract=contract)
     
     @classmethod
     def send_contract_created_email(cls, contract):
@@ -182,27 +574,27 @@ class EmailService:
             return cls._send_email(subject, template_name, context, recipients)
     
     @classmethod
-    def send_expiry_reminder_email(cls, contract):
-        """Send reminder for expiring contract"""
-        subject = f"Contract Expiring Soon: {contract.title}"
+    def send_expiry_reminder_email(cls, contract, recipients=None):
+        """Send expiry reminder email to configured recipients"""
+        if recipients is None:
+            recipients = cls._get_participant_emails(contract, notification_filter='critical')
+            if contract.owner and contract.owner.email:
+                recipients.append(contract.owner.email)
+
+        recipients = list(set(filter(None, recipients)))
+        
+        if not recipients:
+            return False
+        
+        subject = f"Reminder: Contract Expiring Soon - {contract.title}"
         template_name = 'emails/expiry_reminder.html'
         context = {
             'contract': contract,
-            'days_remaining': contract.days_until_expiry,
+            'days_until_expiry': contract.days_until_expiry,
             'site_url': settings.SITE_URL,
         }
-        recipients = cls._get_participant_emails(contract, roles=['OWNER', 'APPROVER'])
-        if contract.owner and contract.owner.email:
-            recipients.append(contract.owner.email)
-        recipients = list(set(recipients))
         
-        if recipients:
-            AuditLog.objects.create(
-                contract=contract,
-                action='RENEWAL_REMINDER',
-                details=f"Expiry reminder sent - {contract.days_until_expiry} days remaining"
-            )
-            return cls._send_email(subject, template_name, context, recipients)
+        return cls._send_email(subject, template_name, context, recipients)
     
     @classmethod
     def send_contract_expired_email(cls, contract):
@@ -253,6 +645,125 @@ class EmailService:
         recipients = list(set(filter(None, recipients)))
         if recipients:
             return cls._send_email(subject, template_name, context, recipients)
+
+    @classmethod
+    def send_data_revision_requested_email(cls, contract, requested_by, previous_status_label=None):
+        """Notify owner/sales that legal requested structured data revision"""
+        requested_by_name = (
+            requested_by.get_full_name() if requested_by and requested_by.get_full_name()
+            else requested_by.username if requested_by else 'Legal Reviewer'
+        )
+
+        subject = f"[REVISION REQUIRED] Contract Data Needs Update: {contract.title}"
+        from_status_text = f" from {previous_status_label}" if previous_status_label else ""
+        message = (
+            f"Hi Team,\n\n"
+            f"Legal requested revisions to the contract data for:\n"
+            f"Contract: {contract.title}\n"
+            f"Requested by: {requested_by_name}\n"
+            f"Status moved back to Draft{from_status_text}.\n\n"
+            f"Please review and update the structured data, then submit again.\n\n"
+            f"Open contract: {settings.SITE_URL}/contracts/{contract.id}/\n\n"
+            f"Best regards,\n"
+            f"Legal CLM System"
+        )
+
+        recipients = cls._get_participant_emails(
+            contract,
+            roles=['OWNER', 'SALES'],
+            notification_filter='critical'
+        )
+        if contract.owner and contract.owner.email:
+            recipients.append(contract.owner.email)
+
+        return cls._send_plain_email(subject, message, recipients, contract=contract)
+
+    @classmethod
+    def send_document_revision_requested_email(cls, contract, document, requested_by, reason):
+        """Notify uploader that document revision was requested by legal"""
+        requested_by_name = (
+            requested_by.get_full_name() if requested_by and requested_by.get_full_name()
+            else requested_by.username if requested_by else 'Legal Reviewer'
+        )
+
+        subject = f"[REVISION REQUIRED] Document Update Needed: {contract.title}"
+        message = (
+            f"Hi Team,\n\n"
+            f"A revision has been requested for a business entity document.\n"
+            f"Contract: {contract.title}\n"
+            f"Document Type: {document.get_document_type_display()}\n"
+            f"Requested by: {requested_by_name}\n"
+            f"Reason: {reason}\n\n"
+            f"Please upload the corrected document in Contract Details.\n"
+            f"Open contract: {settings.SITE_URL}/contracts/{contract.id}/\n\n"
+            f"Best regards,\n"
+            f"Legal CLM System"
+        )
+
+        recipients = []
+        if document.uploaded_by and document.uploaded_by.email:
+            recipients.append(document.uploaded_by.email)
+        elif contract.owner and contract.owner.email:
+            recipients.append(contract.owner.email)
+
+        return cls._send_plain_email(subject, message, recipients, contract=contract)
+
+    @classmethod
+    def send_document_revision_uploaded_email(cls, contract, revision_request, uploaded_by):
+        """Notify legal reviewer that revised document was uploaded"""
+        uploaded_by_name = (
+            uploaded_by.get_full_name() if uploaded_by and uploaded_by.get_full_name()
+            else uploaded_by.username if uploaded_by else 'Uploader'
+        )
+
+        subject = f"[REVIEW REQUIRED] Revised Document Uploaded: {contract.title}"
+        message = (
+            f"Hi Team,\n\n"
+            f"A revised business entity document is ready for legal review.\n"
+            f"Contract: {contract.title}\n"
+            f"Document Type: {revision_request.document.get_document_type_display()}\n"
+            f"Uploaded by: {uploaded_by_name}\n\n"
+            f"Please review and approve/reject the revised document.\n"
+            f"Open contract: {settings.SITE_URL}/contracts/{contract.id}/\n\n"
+            f"Best regards,\n"
+            f"Legal CLM System"
+        )
+
+        recipients = []
+        if revision_request.requested_by and revision_request.requested_by.email:
+            recipients.append(revision_request.requested_by.email)
+
+        return cls._send_plain_email(subject, message, recipients, contract=contract)
+
+    @classmethod
+    def send_document_revision_result_email(cls, contract, revision_request, approved, reviewed_by, notes=''):
+        """Notify uploader that revised document was approved/rejected"""
+        reviewed_by_name = (
+            reviewed_by.get_full_name() if reviewed_by and reviewed_by.get_full_name()
+            else reviewed_by.username if reviewed_by else 'Legal Reviewer'
+        )
+        result_text = 'approved' if approved else 'rejected'
+        subject = f"[UPDATE] Revised Document {result_text.title()}: {contract.title}"
+
+        notes_line = f"Notes: {notes}\n" if notes else ''
+        message = (
+            f"Hi Team,\n\n"
+            f"Your revised business entity document was {result_text}.\n"
+            f"Contract: {contract.title}\n"
+            f"Document Type: {revision_request.document.get_document_type_display()}\n"
+            f"Reviewed by: {reviewed_by_name}\n"
+            f"{notes_line}\n"
+            f"Open contract: {settings.SITE_URL}/contracts/{contract.id}/\n\n"
+            f"Best regards,\n"
+            f"Legal CLM System"
+        )
+
+        recipients = []
+        recipient_user = revision_request.revised_by or revision_request.document.uploaded_by or contract.owner
+        if recipient_user and recipient_user.email:
+            recipients.append(recipient_user.email)
+
+        return cls._send_plain_email(subject, message, recipients, contract=contract)
 
     @classmethod
     def send_draft_generated_email(cls, contract, draft, updated=False):
@@ -311,24 +822,36 @@ class EmailService:
         # Only send if they opted in
         if participant.notification_preference != 'none':
             return cls._send_email(subject, template_name, context, [participant.email])
-    
+
     @classmethod
-    def send_expiry_reminder_email(cls, contract, recipients=None):
-        """Send expiry reminder email to configured recipients"""
-        if recipients is None:
-            recipients = cls._get_participant_emails(contract, notification_filter='critical')
-        
-        if not recipients:
+    def send_comment_added_email(cls, contract, comment):
+        """Notify active participants when a new comment is added."""
+        if not comment:
             return False
-        
-        subject = f"Reminder: Contract Expiring Soon - {contract.title}"
-        template_name = 'emails/expiry_reminder.html'
+
+        commenter_name = 'Unknown User'
+        if comment.user:
+            commenter_name = comment.user.get_full_name() or comment.user.username
+
+        subject = f"[UPDATE] New Comment on Contract: {contract.title}"
+        template_name = 'emails/comment_added.html'
         context = {
             'contract': contract,
-            'days_until_expiry': contract.days_until_expiry,
+            'comment': comment,
+            'commenter_name': commenter_name,
             'site_url': settings.SITE_URL,
         }
-        
+
+        recipients = cls._get_participant_emails(contract, notification_filter='critical')
+        if contract.owner and contract.owner.email:
+            recipients.append(contract.owner.email)
+
+        if comment.user and comment.user.email:
+            recipients = [email for email in recipients if email != comment.user.email]
+
+        recipients = list(set(filter(None, recipients)))
+        if not recipients:
+            return False
         return cls._send_email(subject, template_name, context, recipients)
     
     @classmethod
@@ -502,6 +1025,72 @@ class ContractTargetService:
         return context
 
 
+class ContractNumberService:
+    """Generate contract numbers with independent running sequences per type/company."""
+
+    DEFAULT_COMPANY_CODE = 'PCI'
+    DEFAULT_DEPARTMENT_CODE = 'SALES'
+
+    @staticmethod
+    def _derive_company_code_from_profile(company):
+        if company and company.short_name:
+            return company.short_name.strip().upper().replace(' ', '')
+
+        if company and company.name:
+            words = [w for w in company.name.strip().split() if w and w[0].isalnum()]
+            if words:
+                return ''.join(word[0].upper() for word in words)[:8]
+
+        return 'PCI'
+
+    @classmethod
+    @transaction.atomic
+    def generate_for_contract(cls, contract):
+        """Generate and return next contract number for a contract."""
+        from .models import ContractNumberSequence, ContractTypeDefinition, CompanyProfile
+
+        type_def = ContractTypeDefinition.objects.filter(
+            code=contract.contract_type,
+            active=True,
+        ).first()
+        if not type_def:
+            raise ValueError('Contract type is not active or not configured in Contract Type Definitions.')
+
+        type_code = (type_def.number_prefix or '').strip()
+        if not type_code:
+            raise ValueError('Contract type is not configured for automatic contract numbering.')
+
+        company_code = (type_def.number_company_code or '').strip().upper().replace(' ', '')
+        if not company_code:
+            company_code = (getattr(contract, 'issuing_company_code', '') or '').strip().upper().replace(' ', '')
+        if not company_code:
+            active_company = CompanyProfile.get_active()
+            company_code = cls._derive_company_code_from_profile(active_company)
+        if not company_code:
+            company_code = cls.DEFAULT_COMPANY_CODE
+
+        department_code = (type_def.number_department_code or '').strip().upper().replace(' ', '')
+        if not department_code:
+            department_code = cls.DEFAULT_DEPARTMENT_CODE
+
+        now = timezone.now()
+        year = now.year
+        month = now.month
+
+        sequence, _ = ContractNumberSequence.objects.select_for_update().get_or_create(
+            contract_type=type_def,
+            year=year,
+            month=month,
+            defaults={'last_number': 0}
+        )
+
+        sequence.last_number += 1
+        sequence.save(update_fields=['last_number', 'updated_at'])
+
+        running_number = f"{sequence.last_number:03d}"
+        return f"{type_code}.{running_number}/{company_code}/{department_code}/{month:02d}/{year}"
+
+
 class TemplateService:
     """Service for loading, validating, and rendering contract templates"""
     
@@ -567,6 +1156,7 @@ class TemplateService:
         from datetime import timedelta
         from decimal import Decimal
         from django.utils import timezone
+        from .models import ContractTypeDefinition, ContractType
 
         quarter_context = ContractTargetService.get_quarter_context(contract)
         
@@ -592,6 +1182,20 @@ class TemplateService:
             **contract_data_dict
         }
 
+        type_def = ContractTypeDefinition.objects.filter(code=contract.contract_type).first()
+        if type_def:
+            # Always prefer latest type-level configuration so regenerated drafts
+            # reflect current Lampiran product scope and incentive scheme.
+            if type_def.product_scope_text:
+                context['product_scope_text'] = type_def.product_scope_text
+            else:
+                context.setdefault('product_scope_text', '')
+
+            if type_def.incentive_scheme_text:
+                context['incentive_scheme_text'] = type_def.incentive_scheme_text
+            else:
+                context.setdefault('incentive_scheme_text', '')
+
         # Ensure key GT template variables have defaults
         if not context.get('party_b_name') and contract.party_b:
             context['party_b_name'] = contract.party_b
@@ -603,24 +1207,70 @@ class TemplateService:
         if not context.get('party_b_registered_address') and context.get('party_b_address'):
             context['party_b_registered_address'] = context.get('party_b_address')
 
+        if not context.get('party_b_address') and context.get('party_b_registered_address'):
+            context['party_b_address'] = context.get('party_b_registered_address')
+
+        if not context.get('party_b_representative') and context.get('party_b_representative_name'):
+            context['party_b_representative'] = context.get('party_b_representative_name')
+
+        if not context.get('party_b_representative_name') and context.get('party_b_representative'):
+            context['party_b_representative_name'] = context.get('party_b_representative')
+
         if not context.get('party_b_authorized_representative_name') and context.get('party_b_representative_name'):
             context['party_b_authorized_representative_name'] = context.get('party_b_representative_name')
 
         if not context.get('party_b_authorized_representative_title') and context.get('party_b_representative_title'):
             context['party_b_authorized_representative_title'] = context.get('party_b_representative_title')
 
-        if not context.get('contract_number'):
-            context['contract_number'] = str(contract.id)
+        resolved_contract_number = getattr(contract, 'contract_number', '') or f"DRAFT-{contract.id}"
+        context['contract_number'] = resolved_contract_number
+        context['no_contract'] = resolved_contract_number
 
-        # Format dates in Indonesian (DD Bulan YYYY)
-        def format_date_indonesian(date_obj):
-            """Format date as DD Bulan YYYY in Indonesian"""
+        # Format dates as D Month YYYY (for example: 1 May 2026)
+        def format_date_human(date_obj):
+            """Format date as D Month YYYY using English month names."""
             months = {
-                1: 'Januari', 2: 'Februari', 3: 'Maret', 4: 'April',
-                5: 'Mei', 6: 'Juni', 7: 'Juli', 8: 'Agustus',
-                9: 'September', 10: 'Oktober', 11: 'November', 12: 'Desember'
+                1: 'January', 2: 'February', 3: 'March', 4: 'April',
+                5: 'May', 6: 'June', 7: 'July', 8: 'August',
+                9: 'September', 10: 'October', 11: 'November', 12: 'December'
             }
             return f"{date_obj.day} {months[date_obj.month]} {date_obj.year}"
+
+        def normalize_human_date(value):
+            """Normalize supported date values into D Month YYYY format."""
+            from datetime import date, datetime
+
+            if not value:
+                return value
+
+            if isinstance(value, datetime):
+                return format_date_human(value.date())
+
+            if isinstance(value, date):
+                return format_date_human(value)
+
+            if isinstance(value, str):
+                cleaned = value.strip()
+                if not cleaned:
+                    return value
+
+                supported_formats = [
+                    '%Y-%m-%d',
+                    '%d-%m-%Y',
+                    '%d/%m/%Y',
+                    '%d %m %Y',
+                    '%d.%m.%Y',
+                    '%d %b %Y',
+                    '%d %B %Y',
+                ]
+                for fmt in supported_formats:
+                    try:
+                        parsed = datetime.strptime(cleaned, fmt).date()
+                        return format_date_human(parsed)
+                    except ValueError:
+                        continue
+
+            return value
         
         def format_number_with_separator(num_str):
             """Format number with thousand separator using dots: Rp. xxx.xxx.xxx"""
@@ -632,32 +1282,53 @@ class TemplateService:
 
         if not context.get('contract_signing_date'):
             today = timezone.now().date()
-            context['contract_signing_date'] = format_date_indonesian(today)
+            context['contract_signing_date'] = format_date_human(today)
 
         if not context.get('contract_start_date') and contract.start_date:
-            context['contract_start_date'] = format_date_indonesian(contract.start_date)
+            context['contract_start_date'] = format_date_human(contract.start_date)
 
         if not context.get('contract_effective_start_date') and context.get('contract_start_date'):
             context['contract_effective_start_date'] = context.get('contract_start_date')
 
         if not context.get('contract_end_date') and contract.end_date:
-            context['contract_end_date'] = format_date_indonesian(contract.end_date)
+            context['contract_end_date'] = format_date_human(contract.end_date)
 
         if not context.get('contract_effective_end_date') and context.get('contract_end_date'):
             context['contract_effective_end_date'] = context.get('contract_end_date')
+
+        # Normalize date fields that may already come from structured data
+        # with numeric formats like 5 02 2026.
+        for date_key in (
+            'contract_signing_date',
+            'contract_start_date',
+            'contract_end_date',
+            'contract_effective_start_date',
+            'contract_effective_end_date',
+        ):
+            context[date_key] = normalize_human_date(context.get(date_key))
 
         if not context.get('total_purchase_target') and contract.contract_value:
             context['total_purchase_target'] = str(contract.contract_value)
 
         if not context.get('total_annual_purchase_target') and context.get('total_purchase_target'):
             context['total_annual_purchase_target'] = context.get('total_purchase_target')
+
+        target_schema = str(context.get('target_schema') or '').strip().lower()
+        should_auto_split_quarter_targets = contract.contract_type != ContractType.DISTRIBUTOR
         
         # Format total purchase target with thousand separator
         if context.get('total_purchase_target'):
             context['total_purchase_target_formatted'] = format_number_with_separator(context.get('total_purchase_target'))
+        else:
+            context.setdefault('total_purchase_target_formatted', '')
+
+        # Ensure all variables used as default: filter arguments in templates are always defined
+        for key in ('total_annual_purchase_target', 'total_purchase_target', 'total_target_qtr', 'total_target_yrl',
+                    'second_party_place_address', 'party_b_registered_address', 'product_scope_text'):
+            context.setdefault(key, '')
 
         total_target = context.get('total_purchase_target')
-        if total_target:
+        if total_target and should_auto_split_quarter_targets:
             try:
                 total_decimal = Decimal(str(total_target))
                 base = total_decimal // Decimal('4')
@@ -672,17 +1343,51 @@ class TemplateService:
                 if not context.get('sales_target_q4'):
                     context['sales_target_q4'] = str(base + remainder)
                 
-                # Format sales targets with thousand separator
-                if not context.get('sales_target_q1_formatted'):
-                    context['sales_target_q1_formatted'] = format_number_with_separator(context.get('sales_target_q1'))
-                if not context.get('sales_target_q2_formatted'):
-                    context['sales_target_q2_formatted'] = format_number_with_separator(context.get('sales_target_q2'))
-                if not context.get('sales_target_q3_formatted'):
-                    context['sales_target_q3_formatted'] = format_number_with_separator(context.get('sales_target_q3'))
-                if not context.get('sales_target_q4_formatted'):
-                    context['sales_target_q4_formatted'] = format_number_with_separator(context.get('sales_target_q4'))
             except Exception:
                 pass
+
+        for quarter_key in ('sales_target_q1', 'sales_target_q2', 'sales_target_q3', 'sales_target_q4'):
+            formatted_key = f'{quarter_key}_formatted'
+            if context.get(quarter_key) and not context.get(formatted_key):
+                context[formatted_key] = format_number_with_separator(context.get(quarter_key))
+
+        if context.get('total_target_qtr') and not context.get('total_target_qtr_formatted'):
+            context['total_target_qtr_formatted'] = format_number_with_separator(context.get('total_target_qtr'))
+
+        if (
+            contract.contract_type == ContractType.DISTRIBUTOR
+            and target_schema != 'yearly_only'
+            and not context.get('total_target_yrl')
+        ):
+            try:
+                yearly_total = Decimal('0')
+                has_manual_targets = False
+                for quarter_key in ('sales_target_q1', 'sales_target_q2', 'sales_target_q3', 'sales_target_q4'):
+                    quarter_value = context.get(quarter_key)
+                    if quarter_value in (None, ''):
+                        continue
+                    yearly_total += Decimal(str(quarter_value))
+                    has_manual_targets = True
+
+                if has_manual_targets:
+                    if yearly_total == yearly_total.to_integral_value():
+                        context['total_target_yrl'] = str(int(yearly_total))
+                    else:
+                        context['total_target_yrl'] = format(yearly_total.normalize(), 'f')
+            except Exception:
+                pass
+
+        # For yearly_only schema, derive total_target_yrl from total_purchase_target so template variables are always defined.
+        if (
+            contract.contract_type == ContractType.DISTRIBUTOR
+            and target_schema == 'yearly_only'
+            and not context.get('total_target_yrl')
+            and context.get('total_purchase_target')
+        ):
+            context['total_target_yrl'] = context['total_purchase_target']
+
+        if context.get('total_target_yrl') and not context.get('total_target_yrl_formatted'):
+            context['total_target_yrl_formatted'] = format_number_with_separator(context.get('total_target_yrl'))
 
         if contract.start_date:
             start_date = contract.start_date
@@ -1146,13 +1851,11 @@ class ReminderService:
                     continue
                 contracts = Contract.objects.filter(
                     contract_type=config.contract_type.code,
-                    status__in=[ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE, 
-                               ContractStatus.SIGNED, ContractStatus.EXPIRING_SOON]
+                    status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
                 )
             else:  # GLOBAL
                 contracts = Contract.objects.filter(
-                    status__in=[ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE,
-                               ContractStatus.SIGNED, ContractStatus.EXPIRING_SOON]
+                    status__in=[ContractStatus.APPROVED, ContractStatus.ACTIVE, ContractStatus.EXPIRING_SOON]
                 )
             
             # Check each contract against this configuration
